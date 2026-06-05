@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { z } from "zod/v4";
 import { ExtractionResultSchema, validateCnp, type ExtractionResult } from "@asicom/shared";
 
 // Sonnet by default; escalate to Opus on a cheap high-signal failure (the spec's choice).
@@ -34,6 +34,25 @@ Reguli stricte:
 - CNP-ul are 13 cifre, fără spații.
 - Transcrie exact (diacritice, majuscule) ce scrie pe document.`;
 
+/**
+ * The extraction schema is supplied to the model as a (non-strict) TOOL, not as a strict
+ * structured-output format. Structured outputs are grammar-compiled and cap optional parameters
+ * at 24; our four optional doc sub-objects (every field optional by design) total 48, which the
+ * API rejects ("too many optional parameters"). Tool use carries no such limit. The returned
+ * input is validated with the SAME zod schema, so the shared schema stays the single source of truth.
+ */
+function toInputSchema(schema: z.ZodType): { type: "object"; [k: string]: unknown } {
+  const json = z.toJSONSchema(schema) as Record<string, unknown>;
+  delete json.$schema; // Anthropic's input_schema is plain JSON Schema; the $schema key is noise
+  return json as { type: "object"; [k: string]: unknown };
+}
+
+export const EXTRACT_TOOL = {
+  name: "extrage_date_document",
+  description: "Înregistrează tipul documentului și câmpurile extrase din imaginea documentului.",
+  input_schema: toInputSchema(ExtractionResultSchema),
+};
+
 let client: Anthropic | undefined;
 function getClient(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -59,10 +78,12 @@ async function callModel(
   base64: string,
   media: ImageMedia,
 ): Promise<ExtractionResult | null> {
-  const res = await getClient().messages.parse({
+  const res = await getClient().messages.create({
     model,
     max_tokens: 2048,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+    tools: [EXTRACT_TOOL],
+    tool_choice: { type: "tool", name: EXTRACT_TOOL.name },
     messages: [
       {
         role: "user",
@@ -75,9 +96,13 @@ async function callModel(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(ExtractionResultSchema) },
   });
-  return res.parsed_output;
+
+  // Forced tool_choice → the model answers with a single tool_use block carrying the data.
+  const block = res.content.find((b) => b.type === "tool_use");
+  if (!block || block.type !== "tool_use") return null;
+  const parsed = ExtractionResultSchema.safeParse(block.input);
+  return parsed.success ? parsed.data : null;
 }
 
 /**
