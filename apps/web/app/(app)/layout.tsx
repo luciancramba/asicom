@@ -35,6 +35,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               preview
             </span>
           </Link>
+          <Link
+            href="/portal-client"
+            className="flex items-center gap-1.5 transition-colors hover:text-white"
+          >
+            Portal client
+            <span className="rounded bg-white/20 px-1 py-px text-[9px] font-bold uppercase tracking-wider">
+              preview
+            </span>
+          </Link>
         </nav>
         <div className="flex items-center gap-4 text-sm text-white/85">
           <span className="hidden sm:inline">{user}</span>
