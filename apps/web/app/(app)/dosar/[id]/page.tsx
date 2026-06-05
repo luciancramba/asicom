@@ -48,9 +48,13 @@ export default async function DosarPage({
   );
   const processed = extractions.length > 0;
 
-  const photoByDoc: Record<string, string | undefined> = {};
+  // Group ALL photos by their classified doc-type. The fišă panel for each group renders one
+  // sticky image per source photo, stacked — so a "Date vehicul" panel built from a talon + a CIV
+  // book shows both images, making the multi-photo merge visually obvious.
+  const photosByDoc: Record<string, string[]> = {};
   for (const p of photos) {
-    if (p.docType && !photoByDoc[p.docType]) photoByDoc[p.docType] = p.id;
+    if (!p.docType) continue;
+    (photosByDoc[p.docType] ??= []).push(p.id);
   }
   // Per-photo extraction map for the inspection panel (click thumbnail → see fields for that photo).
   const extractionByPhotoId = new Map<string, ExtractionResult>();
@@ -110,7 +114,7 @@ export default async function DosarPage({
       {processed ? (
         <>
           <PhotoClassification photos={processedPhotos} />
-          <FisaView fields={fields} photoByDoc={photoByDoc} dosarId={dosar.id} />
+          <FisaView fields={fields} photosByDoc={photosByDoc} dosarId={dosar.id} />
           <StatusAdvance
             dosarId={dosar.id}
             status={dosar.status}

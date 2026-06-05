@@ -19,11 +19,12 @@ const GROUPS: { key: FieldGroup; title: string; source?: "buletin" | "talon" }[]
  */
 export function FisaView({
   fields,
-  photoByDoc,
+  photosByDoc,
   dosarId,
 }: {
   fields: FieldResult[];
-  photoByDoc: Record<string, string | undefined>;
+  /** All source photos per doc-type. A panel like "Date vehicul" may have multiple (talon + CIV). */
+  photosByDoc: Record<string, string[]>;
   dosarId: string;
 }) {
   const byId = new Map(fields.map((f) => [f.id, f]));
@@ -176,7 +177,13 @@ export function FisaView({
         const rows = fieldsByGroup(g.key)
           .map((def) => byId.get(def.id))
           .filter((f): f is FieldResult => Boolean(f));
-        const photoId = g.source ? photoByDoc[g.source] : undefined;
+        const sourcePhotos = g.source ? (photosByDoc[g.source] ?? []) : [];
+        const sourceLabel =
+          sourcePhotos.length === 0
+            ? null
+            : sourcePhotos.length === 1
+              ? `sursă: ${g.source}`
+              : `combinat din ${sourcePhotos.length} ${g.source === "talon" ? "documente" : "poze"}`;
 
         return (
           <section key={g.key} className="overflow-hidden rounded-xl border border-line">
@@ -184,7 +191,7 @@ export function FisaView({
               <span className="text-xs font-bold uppercase tracking-[0.18em] text-asicom">
                 {g.title}
               </span>
-              {photoId ? <span className="font-mono text-xs text-ink/40">sursă: {g.source}</span> : null}
+              {sourceLabel ? <span className="font-mono text-xs text-ink/40">{sourceLabel}</span> : null}
             </header>
 
             <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_22rem]">
@@ -288,17 +295,27 @@ export function FisaView({
                 })}
               </ul>
 
-              {photoId ? (
+              {sourcePhotos.length > 0 ? (
                 <div className="hidden sm:block">
-                  <div className="sticky top-4">
-                    <ImageViewer
-                      src={`/api/photo/${photoId}`}
-                      alt={g.title}
-                      caption={g.title}
-                    />
-                    <p className="mt-1.5 text-center text-[11px] text-ink/40">
-                      Apasă pe imagine pentru a o mări
-                    </p>
+                  <div className="sticky top-4 flex flex-col gap-3">
+                    {sourcePhotos.map((photoId, idx) => (
+                      <div key={photoId}>
+                        <ImageViewer
+                          src={`/api/photo/${photoId}`}
+                          alt={`${g.title} (poza ${idx + 1})`}
+                          caption={
+                            sourcePhotos.length === 1
+                              ? g.title
+                              : `${g.title} — sursa ${idx + 1} din ${sourcePhotos.length}`
+                          }
+                        />
+                        <p className="mt-1.5 text-center text-[11px] text-ink/40">
+                          {sourcePhotos.length === 1
+                            ? "Apasă pe imagine pentru a o mări"
+                            : `Sursa ${idx + 1} din ${sourcePhotos.length} · apasă pentru zoom`}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : null}
