@@ -34,6 +34,12 @@ Reguli stricte:
 - CNP-ul are 13 cifre, fără spații.
 - Transcrie exact (diacritice, majuscule) ce scrie pe document.
 
+Coordonate (bbox) — pe lângă valorile extrase, completează „bbox" cu coordonate aproximative pentru fiecare câmp:
+- Cheia este aceeași cu numele câmpului din sub-obiect (ex.: „cnp", „nume", „numarInmatriculare", „vin").
+- Coordonate normalizate [0,1] cu originea în colțul stânga-sus: x, y, w, h (lățime, înălțime).
+- Estimează cât poți de bine zona dreptunghiulară unde apare textul. Nu e nevoie de precizie pixel-perfect; ne folosim pentru a evidenția zona pe poză.
+- Pentru câmpuri care nu apar pe imagine sau nu le poți localiza, omite-le din bbox.
+
 Talon — câmpuri (codurile de pe certificatul de înmatriculare):
 - "numarInmatriculare" = codul A
 - "vin" (serie șasiu) = codul E (17 caractere, fără I/O/Q)

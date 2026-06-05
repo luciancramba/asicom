@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { BBox } from "@asicom/shared";
 
 interface Props {
   src: string;
   alt: string;
   /** Optional caption shown on the lightbox (e.g. the doc-type label). */
   caption?: string;
+  /** Optional bbox (normalized [0,1]) to spotlight on the inline image. */
+  spotlight?: BBox;
 }
 
 /**
@@ -19,9 +22,21 @@ interface Props {
  * Escape closes the lightbox. Click on the dimmed backdrop also closes. The image itself swallows
  * the click so accidental closes don't happen while zooming.
  */
-export function ImageViewer({ src, alt, caption }: Props) {
+export function ImageViewer({ src, alt, caption, spotlight }: Props) {
   const [open, setOpen] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+
+  // Spotlight rectangle (inline image only) — semi-transparent black around the highlight, with
+  // a brand-orange border on the bbox region. Position/size are percentages so they scale with the
+  // image regardless of its rendered dimensions.
+  const spotStyle = spotlight
+    ? {
+        left: `${Math.max(0, Math.min(100, spotlight.x * 100))}%`,
+        top: `${Math.max(0, Math.min(100, spotlight.y * 100))}%`,
+        width: `${Math.max(0.5, Math.min(100, spotlight.w * 100))}%`,
+        height: `${Math.max(0.5, Math.min(100, spotlight.h * 100))}%`,
+      }
+    : undefined;
 
   useEffect(() => {
     if (!open) return;
@@ -47,6 +62,13 @@ export function ImageViewer({ src, alt, caption }: Props) {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt} className="w-full object-cover" />
+        {spotStyle ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute rounded-md border-2 border-amber-400 shadow-[0_0_0_4000px_rgba(10,20,40,0.35)] transition-all"
+            style={spotStyle}
+          />
+        ) : null}
         <span className="pointer-events-none absolute right-1.5 top-1.5 rounded-md bg-ink/70 px-1.5 py-0.5 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
           🔍 Mărește
         </span>

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { buildFisa, type ExtractionResult, type FieldOverrides } from "@asicom/shared";
 import { StatusChip } from "@/components/status-chip";
 import { FisaView } from "@/components/fisa-view";
@@ -37,15 +37,19 @@ export default async function DosarPage({
   if (!dosar) notFound();
 
   const photos = db.select().from(schema.photos).where(eq(schema.photos.dosarId, id)).all();
+  // Order by creation time so the parallel photoIds array lines up with extractions in the
+  // same order the processing loop produced them — buildFisa relies on this for provenance.
   const extractionRows = db
     .select()
     .from(schema.extractions)
     .where(eq(schema.extractions.dosarId, id))
+    .orderBy(asc(schema.extractions.createdAt))
     .all();
 
   const extractions: ExtractionResult[] = extractionRows.map(
     (r) => JSON.parse(r.fieldsJson) as ExtractionResult,
   );
+  const photoIdsByExtraction = extractionRows.map((r) => r.photoId ?? "");
   const processed = extractions.length > 0;
 
   // Group ALL photos by their classified doc-type. The fišă panel for each group renders one
@@ -68,7 +72,7 @@ export default async function DosarPage({
   }));
 
   const overrides = parseOverrides(dosar.fieldOverridesJson);
-  const fields = processed ? buildFisa(extractions, overrides) : [];
+  const fields = processed ? buildFisa(extractions, overrides, photoIdsByExtraction) : [];
   const unverifiedCount = fields.filter((f) => f.value && f.confidence.state !== "verified").length;
 
   return (

@@ -16,7 +16,7 @@ export type FieldOverrides = Record<string, FieldOverride | undefined>;
 import { validateCnp, type CnpDecoded } from "./validators/cnp";
 import { validateVin } from "./validators";
 import { validateExpiry, validateBirthDate, isValidIsoDate } from "./validators/dates";
-import type { Buletin, Talon, Permis, ExtractionResult } from "./schemas";
+import type { Buletin, Talon, Permis, ExtractionResult, BBox } from "./schemas";
 
 export interface FieldResult {
   id: string;
@@ -26,6 +26,10 @@ export interface FieldResult {
   /** extracted / derived value, or null if missing */
   value: string | null;
   confidence: FieldConfidence;
+  /** Approximate location of this value on the source photo (normalized [0,1]). Best-effort. */
+  bbox?: BBox;
+  /** Which uploaded photo this field's value was read from. Used for the per-field crop URL. */
+  sourcePhotoId?: string;
 }
 
 export interface Docs {
@@ -180,13 +184,14 @@ export function collectDocs(extractions: ExtractionResult[]): Docs {
  * Map a dosar's extractions onto the field registry (Insuretech order) and compute the
  * three-state confidence per field. This is the trust engine: green = machine-verified OR
  * broker-confirmed. The `overrides` argument layers operator decisions on top of the machine
- * extraction — a broker-typed value replaces the extracted one, and `confirmed: true` flips a
- * non-empty field to a broker-stamped green. Existing call sites that pass only `extractions`
- * keep their behaviour (no overrides).
+ * extraction. `photoIds` (parallel to `extractions`) is optional — when provided, each
+ * FieldResult is enriched with the bbox and source photo id from the extraction that contributed
+ * its value, so the UI can render a per-field crop and a spotlight on the source photo.
  */
 export function buildFisa(
   extractions: ExtractionResult[],
   overrides: FieldOverrides = {},
+  photoIds?: string[],
 ): FieldResult[] {
   const docs = collectDocs(extractions);
   const cnp = docs.buletin?.cnp ? validateCnp(docs.buletin.cnp) : undefined;
@@ -199,6 +204,29 @@ export function buildFisa(
     const extractedValue = readValue(field, docs);
     const hasOverrideValue = typeof override?.value === "string";
     const value = hasOverrideValue ? (override!.value as string).trim() || null : extractedValue;
+
+    // Provenance: find the first extraction of the matching docType whose sub-object has a
+    // non-empty value for this field's key. That mirrors the merge rule ("first non-empty wins")
+    // and lets us pull the bbox + source photo id from the actual contributor.
+    let bbox: BBox | undefined;
+    let sourcePhotoId: string | undefined;
+    if (field.extract && !hasOverrideValue) {
+      const targetDoc = field.extract.doc;
+      const key = field.extract.key;
+      for (let i = 0; i < extractions.length; i++) {
+        const ex = extractions[i];
+        if (ex.docType !== targetDoc) continue;
+        const sub = (ex as unknown as Record<string, unknown>)[targetDoc] as
+          | Record<string, unknown>
+          | undefined;
+        const raw = sub?.[key];
+        if (raw == null || raw === "") continue;
+        if (typeof raw === "object" && Object.keys(raw as object).length === 0) continue;
+        bbox = ex.bbox?.[key];
+        sourcePhotoId = photoIds?.[i];
+        break;
+      }
+    }
 
     // Confidence: compute as normal, then let a confirmed override stamp it broker-green.
     let confidence = computeConfidence(field, value, ctx);
@@ -213,6 +241,8 @@ export function buildFisa(
       source: field.source,
       value,
       confidence,
+      bbox,
+      sourcePhotoId,
     };
   });
 }

@@ -97,9 +97,25 @@ export const SCHEMA_BY_DOC_TYPE = {
 } as const;
 
 /**
+ * Bounding box for a single field on the source image, normalized to [0,1] so it survives the
+ * client-side downscale. Origin is top-left. Per-field bboxes power the "DIN ACT" crop beside
+ * each extracted value (so the broker compares text-on-text) and the spotlight that follows the
+ * active field on the full sticky image — see Cramba's verificare-asigurat-prototip.html.
+ */
+export const BBoxSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+});
+export type BBox = z.infer<typeof BBoxSchema>;
+
+/**
  * One vision call per image returns this: the classified `docType` plus the fields for that
- * type only (fill the matching sub-object, leave the others absent). Used as the structured
- * output schema for the extraction call.
+ * type only (fill the matching sub-object, leave the others absent). `bbox` is an optional map
+ * keyed by the same field name the doc sub-object uses (e.g. "cnp", "nume", "numarInmatriculare")
+ * with approximate positions on the photo — Claude returns these on a best-effort basis. The
+ * extraction stays valid if bboxes are missing or partial; the UI just falls back to no crop.
  */
 export const ExtractionResultSchema = z.object({
   docType: DocType,
@@ -107,5 +123,6 @@ export const ExtractionResultSchema = z.object({
   talon: TalonSchema.optional(),
   permis: PermisSchema.optional(),
   policy: PolicySchema.optional(),
+  bbox: z.record(z.string(), BBoxSchema).optional(),
 });
 export type ExtractionResult = z.infer<typeof ExtractionResultSchema>;

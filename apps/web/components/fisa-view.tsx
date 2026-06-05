@@ -1,10 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { fieldsByGroup, type FieldResult, type FieldGroup } from "@asicom/shared";
+import { fieldsByGroup, type BBox, type FieldResult, type FieldGroup } from "@asicom/shared";
 import { ConfidenceBadge } from "./confidence-badge";
 import { ImageViewer } from "./image-viewer";
 import { setFieldValue, toggleFieldConfirmed } from "@/lib/actions";
+
+/**
+ * CSS-only crop of a source image to the normalized bbox area. The image is scaled so the bbox
+ * region fills the container, and shifted so the bbox sits at the container origin. Works for
+ * any container size; the caller controls dimensions via parent CSS.
+ */
+function cropStyle(bbox: BBox, photoId: string): React.CSSProperties {
+  // Background size: scale so bbox-fraction maps to 100% of container.
+  // Background position percentage formula: posX = bbox.x / (1 - bbox.w) * 100.
+  const safeW = Math.max(0.001, Math.min(1, bbox.w));
+  const safeH = Math.max(0.001, Math.min(1, bbox.h));
+  const posX = safeW >= 1 ? 0 : (bbox.x / (1 - safeW)) * 100;
+  const posY = safeH >= 1 ? 0 : (bbox.y / (1 - safeH)) * 100;
+  return {
+    backgroundImage: `url(/api/photo/${photoId})`,
+    backgroundRepeat: "no-repeat",
+    backgroundSize: `${100 / safeW}% ${100 / safeH}%`,
+    backgroundPosition: `${posX}% ${posY}%`,
+  };
+}
 
 interface PanelDef {
   key: FieldGroup;
@@ -388,24 +408,33 @@ export function FisaView({
         {sourcePhotos.length > 0 ? (
           <div className="hidden sm:block">
             <div className="sticky top-4 flex flex-col gap-3">
-              {sourcePhotos.map((photoId, idx) => (
-                <div key={photoId}>
-                  <ImageViewer
-                    src={`/api/photo/${photoId}`}
-                    alt={`${panelDef.title} (poza ${idx + 1})`}
-                    caption={
-                      sourcePhotos.length === 1
-                        ? panelDef.title
-                        : `${panelDef.title} — sursa ${idx + 1} din ${sourcePhotos.length}`
-                    }
-                  />
-                  <p className="mt-1 text-center text-[11px] text-ink/40">
-                    {sourcePhotos.length === 1
-                      ? "Apasă pentru zoom"
-                      : `Sursa ${idx + 1} din ${sourcePhotos.length}`}
-                  </p>
-                </div>
-              ))}
+              {sourcePhotos.map((photoId, idx) => {
+                // Spotlight the active field's bbox ONLY on the photo it actually came from.
+                const activeField = visibleFields.find((f) => f.id === activeFieldId);
+                const spotlight =
+                  activeField?.bbox && activeField.sourcePhotoId === photoId
+                    ? activeField.bbox
+                    : undefined;
+                return (
+                  <div key={photoId}>
+                    <ImageViewer
+                      src={`/api/photo/${photoId}`}
+                      alt={`${panelDef.title} (poza ${idx + 1})`}
+                      caption={
+                        sourcePhotos.length === 1
+                          ? panelDef.title
+                          : `${panelDef.title} — sursa ${idx + 1} din ${sourcePhotos.length}`
+                      }
+                      spotlight={spotlight}
+                    />
+                    <p className="mt-1 text-center text-[11px] text-ink/40">
+                      {sourcePhotos.length === 1
+                        ? "Apasă pentru zoom"
+                        : `Sursa ${idx + 1} din ${sourcePhotos.length}`}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : null}
@@ -556,19 +585,33 @@ function FieldRow({
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onStartEdit();
-          }}
-          disabled={isPending}
-          className="-mx-1 block w-full truncate rounded px-1 py-0.5 text-left font-mono text-lg text-ink transition-colors hover:bg-asicom/5"
-        >
-          {f.value ?? (
-            <span className="text-base text-ink/40">— completează manual —</span>
-          )}
-        </button>
+        <>
+          {f.bbox && f.sourcePhotoId ? (
+            <div className="overflow-hidden rounded border border-line bg-cloud">
+              <div className="flex items-center gap-2 border-b border-line/60 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-ink/40">
+                <span>Din act</span>
+              </div>
+              <div
+                className="h-14 w-full"
+                style={cropStyle(f.bbox, f.sourcePhotoId)}
+                aria-label={`Decupaj din poză pentru ${f.label}`}
+              />
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartEdit();
+            }}
+            disabled={isPending}
+            className="-mx-1 block w-full truncate rounded px-1 py-0.5 text-left font-mono text-lg text-ink transition-colors hover:bg-asicom/5"
+          >
+            {f.value ?? (
+              <span className="text-base text-ink/40">— completează manual —</span>
+            )}
+          </button>
+        </>
       )}
 
       {isActive && !isEditing ? (
