@@ -34,10 +34,13 @@ Reguli stricte:
 - CNP-ul are 13 cifre, fără spații.
 - Transcrie exact (diacritice, majuscule) ce scrie pe document.
 
-Coordonate (bbox) — pe lângă valorile extrase, completează „bbox" cu coordonate aproximative pentru fiecare câmp:
+Coordonate (bbox) — pe lângă valorile extrase, completează „bbox" cu coordonate exacte pentru fiecare câmp:
 - Cheia este aceeași cu numele câmpului din sub-obiect (ex.: „cnp", „nume", „numarInmatriculare", „vin").
-- Coordonate normalizate [0,1] cu originea în colțul stânga-sus: x, y, w, h (lățime, înălțime).
-- Estimează cât poți de bine zona dreptunghiulară unde apare textul. Nu e nevoie de precizie pixel-perfect; ne folosim pentru a evidenția zona pe poză.
+- Coordonate normalizate [0,1] cu originea în colțul stânga-sus: x = stânga, y = sus, w = lățime, h = înălțime.
+- IMPORTANT — bbox-ul trebuie să încadreze STRICT TEXTUL CITIT, nu eticheta („CNP", „Nume", etc.). Doar valoarea propriu-zisă.
+- Pentru fiecare câmp, identifică ÎNTÂI poziția pe imagine raportată la repere vizibile (ex.: „SERIE și NUMĂR sunt sus în dreapta, pe linia de sub titlu", „CNP-ul e o linie sub seria"), apoi convertește în coordonate normalizate.
+- Atenție la fundal: documentul poate fi fotografiat pe o masă/față de masă, deci nu ocupă întreaga imagine. y=0 este partea de SUS A FOTOGRAFIEI, nu a documentului. Dacă documentul începe la y=0.15 (15% de jos sus apare fundalul), atunci primul rând de text e probabil la y~0.20-0.25, NU la y=0.05.
+- Înălțimea unui rând de text este de obicei 0.02-0.04 (2-4% din înălțimea fotografiei). Nu pune h>0.10 pentru câmpuri pe o singură linie.
 - Pentru câmpuri care nu apar pe imagine sau nu le poți localiza, omite-le din bbox.
 
 Talon — câmpuri (codurile de pe certificatul de înmatriculare):

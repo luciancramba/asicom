@@ -7,17 +7,28 @@ import { ImageViewer } from "./image-viewer";
 import { setFieldValue, toggleFieldConfirmed } from "@/lib/actions";
 
 /**
- * CSS-only crop of a source image to the normalized bbox area. The image is scaled so the bbox
- * region fills the container, and shifted so the bbox sits at the container origin. Works for
- * any container size; the caller controls dimensions via parent CSS.
+ * CSS-only crop of a source image to the normalized bbox area, expanded with padding so that
+ * even when Claude's bbox drifts ~5-10% the actual text still falls inside the visible crop.
+ * The image is scaled so the padded bbox region fills the container; works at any container
+ * size. The spotlight uses the exact bbox (precise pointer); only the *crop* is forgiving.
  */
 function cropStyle(bbox: BBox, photoId: string): React.CSSProperties {
-  // Background size: scale so bbox-fraction maps to 100% of container.
-  // Background position percentage formula: posX = bbox.x / (1 - bbox.w) * 100.
-  const safeW = Math.max(0.001, Math.min(1, bbox.w));
-  const safeH = Math.max(0.001, Math.min(1, bbox.h));
-  const posX = safeW >= 1 ? 0 : (bbox.x / (1 - safeW)) * 100;
-  const posY = safeH >= 1 ? 0 : (bbox.y / (1 - safeH)) * 100;
+  // Pad by 50% of bbox dimensions on each side, capped at image bounds. Wider than tall to give
+  // horizontal context (broker scans left→right to find the label) — h padding stays modest so
+  // we don't expand vertically into the row above/below.
+  const padX = bbox.w * 0.6;
+  const padY = bbox.h * 1.0;
+  const x = Math.max(0, bbox.x - padX);
+  const y = Math.max(0, bbox.y - padY);
+  const right = Math.min(1, bbox.x + bbox.w + padX);
+  const bottom = Math.min(1, bbox.y + bbox.h + padY);
+  const w = right - x;
+  const h = bottom - y;
+
+  const safeW = Math.max(0.001, Math.min(1, w));
+  const safeH = Math.max(0.001, Math.min(1, h));
+  const posX = safeW >= 1 ? 0 : (x / (1 - safeW)) * 100;
+  const posY = safeH >= 1 ? 0 : (y / (1 - safeH)) * 100;
   return {
     backgroundImage: `url(/api/photo/${photoId})`,
     backgroundRepeat: "no-repeat",
