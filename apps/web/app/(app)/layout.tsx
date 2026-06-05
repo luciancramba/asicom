@@ -27,21 +27,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             Clienți
           </Link>
           <Link
-            href="/automatizari"
+            href="/preview"
             className="flex items-center gap-1.5 transition-colors hover:text-white"
           >
-            Automatizări
+            Previews
             <span className="rounded bg-white/20 px-1 py-px text-[9px] font-bold uppercase tracking-wider">
-              preview
-            </span>
-          </Link>
-          <Link
-            href="/portal-client"
-            className="flex items-center gap-1.5 transition-colors hover:text-white"
-          >
-            Portal client
-            <span className="rounded bg-white/20 px-1 py-px text-[9px] font-bold uppercase tracking-wider">
-              preview
+              demo
             </span>
           </Link>
         </nav>
