@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { fieldsByGroup, type FieldResult, type FieldGroup } from "@asicom/shared";
 import { ConfidenceBadge } from "./confidence-badge";
+import { setFieldValue, toggleFieldConfirmed } from "@/lib/actions";
 
 const GROUPS: { key: FieldGroup; title: string; source?: "buletin" | "talon" }[] = [
   { key: "client", title: "Date asigurat", source: "buletin" },
@@ -12,27 +13,28 @@ const GROUPS: { key: FieldGroup; title: string; source?: "buletin" | "talon" }[]
 
 /**
  * Fišă de emitere — fields in Insuretech order, three-state badges, source document beside each
- * group, copy-per-field with auto-advance, and copy-all. The trust machine + the time-saver.
+ * group, copy-per-field with auto-advance, copy-all, click-to-confirm broker greens, and inline
+ * edit on missing/wrong values. The trust machine + the time-saver.
  */
 export function FisaView({
   fields,
   photoByDoc,
+  dosarId,
 }: {
   fields: FieldResult[];
   photoByDoc: Record<string, string | undefined>;
+  dosarId: string;
 }) {
   const byId = new Map(fields.map((f) => [f.id, f]));
   const copyable = fields.filter((f) => f.value); // ordered, for auto-advance
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(copyable[0]?.id ?? null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [, startTransition] = useTransition();
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
-  /**
-   * Copy text to the clipboard reliably. Try the modern async API first; if that fails
-   * (focus, permission, or insecure context), fall back to a hidden textarea + execCommand,
-   * which works in iframes and on older Safari. Returns whether the copy actually succeeded
-   * — we surface that to the user rather than silently flashing "Copiat" on a failed copy.
-   */
   async function writeClipboard(text: string): Promise<boolean> {
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -40,7 +42,7 @@ export function FisaView({
         return true;
       }
     } catch {
-      /* fall through to legacy fallback */
+      /* fall through */
     }
     try {
       const ta = document.createElement("textarea");
@@ -63,7 +65,6 @@ export function FisaView({
     setCopiedId(id);
     setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1200);
   }
-
   function flashError(id: string) {
     setCopiedId((c) => (c === id ? null : c));
     setErrorId(id);
@@ -89,6 +90,47 @@ export function FisaView({
     else flashError("__all__");
   }
 
+  /** Toggle broker-confirmed via Server Action; uses startTransition so the click feels immediate. */
+  function onBadgeClick(f: FieldResult) {
+    setPendingId(f.id);
+    const fd = new FormData();
+    fd.set("dosarId", dosarId);
+    fd.set("fieldId", f.id);
+    startTransition(async () => {
+      try {
+        await toggleFieldConfirmed(fd);
+      } finally {
+        setPendingId((p) => (p === f.id ? null : p));
+      }
+    });
+  }
+
+  function startEdit(f: FieldResult) {
+    setEditingId(f.id);
+    setEditValue(f.value ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditValue("");
+  }
+
+  function saveEdit(f: FieldResult) {
+    setPendingId(f.id);
+    const fd = new FormData();
+    fd.set("dosarId", dosarId);
+    fd.set("fieldId", f.id);
+    fd.set("value", editValue);
+    startTransition(async () => {
+      try {
+        await setFieldValue(fd);
+      } finally {
+        setEditingId((e) => (e === f.id ? null : e));
+        setPendingId((p) => (p === f.id ? null : p));
+      }
+    });
+  }
+
   const verifiedCount = fields.filter((f) => f.confidence.state === "verified").length;
   const totalWithValue = fields.filter((f) => f.value).length;
 
@@ -97,13 +139,13 @@ export function FisaView({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-cloud px-4 py-3 text-xs text-ink/70">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span>
-            <span className="font-bold text-ok">✓</span> Verificat — confirmat de un calcul (ex. CNP)
+            <span className="font-bold text-ok">✓</span> Verificat — apasă pe ⚠ pentru a confirma manual
           </span>
           <span>
             <span className="font-bold text-warn">⚠</span> Verifică — extras corect, controlează cu ochiul
           </span>
           <span>
-            <span className="font-bold text-fail">✗</span> Eroare — nepotrivire sau invalid
+            <span className="font-bold text-fail">✗</span> Eroare — nepotrivire sau invalid (poți edita)
           </span>
         </div>
         <span className="font-mono">
@@ -148,6 +190,16 @@ export function FisaView({
               <ul className="flex flex-col divide-y divide-line">
                 {rows.map((f) => {
                   const isActive = f.id === activeId;
+                  const isEditing = editingId === f.id;
+                  const isPending = pendingId === f.id;
+                  const isBrokerGreen = f.confidence.state === "verified" && f.confidence.by === "broker";
+                  const canConfirm = f.confidence.state !== "verified" && Boolean(f.value);
+                  const badgeHint = isBrokerGreen
+                    ? "Apasă pentru a anula confirmarea"
+                    : canConfirm
+                      ? "Apasă pentru a confirma manual"
+                      : f.confidence.reason;
+
                   return (
                     <li
                       key={f.id}
@@ -156,14 +208,63 @@ export function FisaView({
                       }`}
                     >
                       <div className="min-w-0">
-                        <div className="text-xs text-ink/50">{f.label}</div>
-                        <div className="truncate font-mono text-sm text-ink">{f.value ?? "—"}</div>
+                        <div className="flex items-center gap-2 text-xs text-ink/50">
+                          {f.label}
+                          {!isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(f)}
+                              disabled={isPending}
+                              aria-label={`Editează ${f.label}`}
+                              className="text-ink/30 transition-colors hover:text-asicom disabled:opacity-30"
+                            >
+                              ✎
+                            </button>
+                          ) : null}
+                        </div>
+                        {isEditing ? (
+                          <div className="mt-1 flex items-center gap-2">
+                            <input
+                              autoFocus
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEdit(f);
+                                if (e.key === "Escape") cancelEdit();
+                              }}
+                              className="w-full rounded border border-line bg-white px-2 py-1 font-mono text-sm text-ink outline-none focus:border-asicom-mid"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => saveEdit(f)}
+                              disabled={isPending}
+                              className="rounded-md bg-asicom px-2 py-1 text-xs font-medium text-white hover:bg-asicom-mid disabled:opacity-50"
+                            >
+                              Salvează
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              className="text-xs text-ink/60 hover:text-ink"
+                            >
+                              Anulează
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="truncate font-mono text-sm text-ink">{f.value ?? "—"}</div>
+                        )}
                       </div>
-                      <ConfidenceBadge state={f.confidence.state} reason={f.confidence.reason} />
+                      <ConfidenceBadge
+                        state={f.confidence.state}
+                        reason={f.confidence.reason}
+                        hint={badgeHint}
+                        onClick={canConfirm || isBrokerGreen ? () => onBadgeClick(f) : undefined}
+                        disabled={isPending}
+                      />
                       <button
                         type="button"
                         onClick={() => copyField(f)}
-                        disabled={!f.value}
+                        disabled={!f.value || isEditing}
                         aria-label={`Copiază ${f.label}`}
                         className={`w-20 rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-30 ${
                           errorId === f.id

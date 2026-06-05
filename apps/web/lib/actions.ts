@@ -1,9 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import type { ExtractionResult } from "@asicom/shared";
+import type { ExtractionResult, FieldOverride, FieldOverrides } from "@asicom/shared";
+import { FIELD_REGISTRY } from "@asicom/shared";
 import { getCurrentUser } from "./auth";
 import { getDb, schema } from "./db";
 import { saveUpload } from "./storage";
@@ -104,4 +106,118 @@ export async function processDosar(formData: FormData): Promise<void> {
   else if (failed > 0) params.set("warn", String(failed));
   const qs = params.toString();
   redirect(`/dosar/${dosarId}${qs ? `?${qs}` : ""}`);
+}
+
+// ---------- Broker overrides ----------
+
+const VALID_FIELD_IDS = new Set(FIELD_REGISTRY.map((f) => f.id));
+const VALID_STATUSES = new Set(["de_verificat", "gata", "emis"]);
+
+/** Load + safely parse the override map for a dosar. Null/garbage JSON → empty map. */
+function readOverrides(json: string | null): FieldOverrides {
+  if (!json) return {};
+  try {
+    const parsed = JSON.parse(json);
+    return typeof parsed === "object" && parsed !== null ? (parsed as FieldOverrides) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Persist a patched override map, dropping fully-empty entries so the JSON stays tidy. */
+function writeOverrides(dosarId: string, next: FieldOverrides): void {
+  const cleaned: FieldOverrides = {};
+  for (const [k, v] of Object.entries(next)) {
+    if (!v) continue;
+    const hasValue = typeof v.value === "string" && v.value.length > 0;
+    const hasConfirmed = v.confirmed === true;
+    if (hasValue || hasConfirmed) {
+      cleaned[k] = {
+        ...(hasValue ? { value: v.value } : {}),
+        ...(hasConfirmed ? { confirmed: true } : {}),
+      };
+    }
+  }
+  const json = Object.keys(cleaned).length === 0 ? null : JSON.stringify(cleaned);
+  getDb()
+    .update(schema.dosare)
+    .set({ fieldOverridesJson: json })
+    .where(eq(schema.dosare.id, dosarId))
+    .run();
+}
+
+function guardAuth(dosarId: string): asserts dosarId is string {
+  if (!dosarId) redirect("/");
+}
+
+/**
+ * Toggle a broker confirmation on one field. Click 🟡 once → confirmed green; click again → revert.
+ * Editing a value is a separate action (setFieldValue) that auto-confirms — that's the broker rule.
+ */
+export async function toggleFieldConfirmed(formData: FormData): Promise<void> {
+  if (!(await getCurrentUser())) redirect("/login");
+  const dosarId = String(formData.get("dosarId") ?? "");
+  const fieldId = String(formData.get("fieldId") ?? "");
+  guardAuth(dosarId);
+  if (!VALID_FIELD_IDS.has(fieldId)) return;
+
+  const db = getDb();
+  const dosar = db.select().from(schema.dosare).where(eq(schema.dosare.id, dosarId)).get();
+  if (!dosar) redirect("/");
+
+  const overrides = readOverrides(dosar.fieldOverridesJson);
+  const existing = overrides[fieldId] ?? {};
+  const next: FieldOverride = existing.confirmed
+    ? { ...existing, confirmed: false } // un-confirm — keep any value override
+    : { ...existing, confirmed: true };
+  writeOverrides(dosarId, { ...overrides, [fieldId]: next });
+  revalidatePath(`/dosar/${dosarId}`);
+}
+
+/**
+ * Save a broker-typed value. By product rule, saving an edit auto-confirms the field (the broker
+ * already vouched by typing). An empty submitted value clears any prior override, reverting to
+ * the original extraction — this is how a broker "undoes" a previous edit.
+ */
+export async function setFieldValue(formData: FormData): Promise<void> {
+  if (!(await getCurrentUser())) redirect("/login");
+  const dosarId = String(formData.get("dosarId") ?? "");
+  const fieldId = String(formData.get("fieldId") ?? "");
+  const raw = String(formData.get("value") ?? "").trim();
+  guardAuth(dosarId);
+  if (!VALID_FIELD_IDS.has(fieldId)) return;
+
+  const db = getDb();
+  const dosar = db.select().from(schema.dosare).where(eq(schema.dosare.id, dosarId)).get();
+  if (!dosar) redirect("/");
+
+  const overrides = readOverrides(dosar.fieldOverridesJson);
+  const next: FieldOverride = raw === "" ? {} : { value: raw, confirmed: true };
+  writeOverrides(dosarId, { ...overrides, [fieldId]: next });
+  revalidatePath(`/dosar/${dosarId}`);
+}
+
+/**
+ * Advance the dosar status. de_verificat → gata when the broker says "ready to issue"; gata →
+ * emis when the policy is issued. Both directions are reversible (broker can step back). The
+ * confidence gate is enforced in the UI (soft warning) — this action trusts the caller.
+ */
+export async function advanceDosarStatus(formData: FormData): Promise<void> {
+  if (!(await getCurrentUser())) redirect("/login");
+  const dosarId = String(formData.get("dosarId") ?? "");
+  const to = String(formData.get("to") ?? "");
+  guardAuth(dosarId);
+  if (!VALID_STATUSES.has(to)) return;
+
+  const db = getDb();
+  const dosar = db.select().from(schema.dosare).where(eq(schema.dosare.id, dosarId)).get();
+  if (!dosar) redirect("/");
+
+  const patch: { status: string; emisAt?: string | null } = { status: to };
+  if (to === "emis") patch.emisAt = new Date().toISOString();
+  else if (dosar.status === "emis") patch.emisAt = null; // stepping back from emis
+
+  db.update(schema.dosare).set(patch).where(eq(schema.dosare.id, dosarId)).run();
+  revalidatePath(`/dosar/${dosarId}`);
+  revalidatePath("/"); // dashboard counts change
 }

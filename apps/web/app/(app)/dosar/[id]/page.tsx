@@ -1,12 +1,23 @@
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { buildFisa, type ExtractionResult } from "@asicom/shared";
+import { buildFisa, type ExtractionResult, type FieldOverrides } from "@asicom/shared";
 import { StatusChip } from "@/components/status-chip";
 import { FisaView } from "@/components/fisa-view";
 import { ProcessButton } from "@/components/process-button";
 import { ProcessingBar } from "@/components/processing-bar";
+import { StatusAdvance } from "@/components/status-advance";
 import { processDosar } from "@/lib/actions";
 import { getDb, schema } from "@/lib/db";
+
+function parseOverrides(json: string | null): FieldOverrides {
+  if (!json) return {};
+  try {
+    const v = JSON.parse(json);
+    return typeof v === "object" && v !== null ? (v as FieldOverrides) : {};
+  } catch {
+    return {};
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +51,9 @@ export default async function DosarPage({
   for (const p of photos) {
     if (p.docType && !photoByDoc[p.docType]) photoByDoc[p.docType] = p.id;
   }
-  const fields = processed ? buildFisa(extractions) : [];
+  const overrides = parseOverrides(dosar.fieldOverridesJson);
+  const fields = processed ? buildFisa(extractions, overrides) : [];
+  const unverifiedCount = fields.filter((f) => f.value && f.confidence.state !== "verified").length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -83,7 +96,14 @@ export default async function DosarPage({
       </form>
 
       {processed ? (
-        <FisaView fields={fields} photoByDoc={photoByDoc} />
+        <>
+          <FisaView fields={fields} photoByDoc={photoByDoc} dosarId={dosar.id} />
+          <StatusAdvance
+            dosarId={dosar.id}
+            status={dosar.status}
+            unverifiedCount={unverifiedCount}
+          />
+        </>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {photos.map((p) => (
