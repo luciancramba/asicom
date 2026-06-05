@@ -73,6 +73,34 @@ describe("buildFisa", () => {
     expect(find(f, "client.prenume").confidence.state).toBe("verified");
   });
 
+  it("defaults Serie CIV to A000000 when the talon has no CIV rubric (broker rule)", () => {
+    // New-format talons no longer carry Y / Seria CIV; the working default in Insuretech is A000000.
+    const f = buildFisa([
+      { docType: "talon", talon: { vin: "WDD2452071J648520", marca: "MERCEDES-BENZ" } },
+    ]);
+    const civ = find(f, "vehicul.serieCiv");
+    expect(civ.value).toBe("A000000");
+    expect(civ.confidence.state).toBe("unverified");
+    expect(civ.confidence.reason).toMatch(/implicit/i);
+  });
+
+  it("keeps a real Serie CIV when one is extracted from point Y", () => {
+    const f = buildFisa([
+      { docType: "talon", talon: { vin: "ZCFA1MM0382533977", serieCiv: "R262160" } },
+    ]);
+    const civ = find(f, "vehicul.serieCiv");
+    expect(civ.value).toBe("R262160");
+    expect(civ.confidence.reason).not.toMatch(/implicit/i);
+  });
+
+  it("does NOT default Serie CIV when there is no talon at all", () => {
+    // Without a talon the field must stay honestly empty — A000000 is a TALON-without-CIV rule.
+    const f = buildFisa([{ docType: "buletin", buletin: { cnp: "1900515012341" } }]);
+    const civ = find(f, "vehicul.serieCiv");
+    expect(civ.value).toBeNull();
+    expect(civ.confidence.reason).toMatch(/Lipsește/);
+  });
+
   it("cross-checks the name against a permis split across photos (front + back)", () => {
     const ex: ExtractionResult[] = [
       { docType: "buletin", buletin: { nume: "TRIPON", prenume: "LUCIAN-NICOLAE" } },

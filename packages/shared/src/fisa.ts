@@ -45,13 +45,31 @@ function flattenAddress(adr: Buletin["adresa"]): string | null {
   return parts.length ? parts.join(", ") : null;
 }
 
+/**
+ * Broker convention for Serie CIV when the talon doesn't carry it: new-format talons no longer
+ * have the Y rubric, and the working default in Insuretech is the placeholder "A000000". Applied
+ * only when a talon was actually read — if there is no talon at all, the field stays empty so the
+ * fišă renders an honest "lipsește" amber.
+ */
+const CIV_NEW_TALON_PLACEHOLDER = "A000000";
+
 /** Read a registry field's raw value from the extracted documents. */
 function readValue(field: FieldDef, docs: Docs): string | null {
   if (!field.extract) return null;
   if (field.extract.key === "adresa") return flattenAddress(docs.buletin?.adresa);
   const doc = docs[field.extract.doc] as Record<string, unknown> | undefined;
   const raw = doc?.[field.extract.key];
-  return raw == null ? null : String(raw);
+  const value = raw == null ? null : String(raw).trim();
+
+  if (
+    field.id === "vehicul.serieCiv" &&
+    (value == null || value === "") &&
+    docs.talon != null
+  ) {
+    return CIV_NEW_TALON_PLACEHOLDER;
+  }
+
+  return value == null || value === "" ? null : value;
 }
 
 function computeConfidence(field: FieldDef, value: string | null, ctx: Ctx): FieldConfidence {
@@ -82,6 +100,11 @@ function computeConfidence(field: FieldDef, value: string | null, ctx: Ctx): Fie
           : failed("Nu corespunde cu data din CNP");
       }
       return validateBirthDate(value);
+    case "vehicul.serieCiv":
+      if (value === CIV_NEW_TALON_PLACEHOLDER) {
+        return unverified("Talon fără rubrică CIV — implicit A000000");
+      }
+      return unverified("Extras, neverificat");
     case "client.nume":
     case "client.prenume": {
       const key = field.id === "client.nume" ? "nume" : "prenume";
