@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { fieldsByGroup, type BBox, type FieldResult, type FieldGroup } from "@asicom/shared";
 import { ConfidenceBadge } from "./confidence-badge";
 import { ImageViewer } from "./image-viewer";
+import { ExportMenu } from "./export-menu";
 import { setFieldValue, toggleFieldConfirmed } from "@/lib/actions";
 
 /**
@@ -355,6 +356,7 @@ export function FisaView({
         >
           {copiedId === "__panel__" ? "✓ Copiat" : errorId === "__panel__" ? "✗ Eroare" : "Copiază panoul"}
         </button>
+        <ExportMenu fields={fields} filenameBase={dosarId.slice(0, 8)} />
       </div>
 
       {/* Keyboard hint */}
