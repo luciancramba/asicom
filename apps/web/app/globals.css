@@ -12,6 +12,7 @@
   /* Functional — UI only, never in the logo (Brand Book §3) */
   --color-ok: #1f8a5b; /* ✓ date validate */
   --color-warn: #c77b00; /* ⚠ verifică */
+  --color-fail: #b23a2e; /* ✗ validator eșuat — restrained extension beyond the brand's 2 signals (confirm in PR4) */
 
   /* Type — 3 fonts, 3 roles (Brand Book §4). Variables set by next/font on <html>. */
   --font-sans: var(--font-instrument), "Segoe UI", -apple-system, sans-serif;
