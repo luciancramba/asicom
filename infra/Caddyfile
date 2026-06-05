@@ -1,7 +1,7 @@
-# Issuedoc — single VPS, automatic TLS via Let's Encrypt.
+# Asicom — single VPS, automatic TLS via Let's Encrypt.
 # Deploy: `caddy run --config infra/Caddyfile` (or as a systemd service).
 
-issuedoc.cramba.ro {
+asicom.cramba.ro {
 	encode gzip
 
 	# Single-user gate option for the very first demo (uncomment, then

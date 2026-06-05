@@ -6,12 +6,12 @@
  * Runs on a systemd timer (wired in PR6), decoupled from the web app so the retention
  * promise holds even during downtime/deploys.
  *
- *   DATABASE_PATH=./data/issuedoc.db node --experimental-strip-types infra/purge.ts
+ *   DATABASE_PATH=./data/asicom.db node --experimental-strip-types infra/purge.ts
  */
 import Database from "better-sqlite3";
 import { unlinkSync, existsSync } from "node:fs";
 
-const DB_PATH = process.env.DATABASE_PATH ?? "./data/issuedoc.db";
+const DB_PATH = process.env.DATABASE_PATH ?? "./data/asicom.db";
 const RETENTION_DAYS = Number(process.env.PURGE_AFTER_EMIS_DAYS ?? 14);
 
 interface PhotoRow {

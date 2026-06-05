@@ -5,6 +5,6 @@ export default defineConfig({
   schema: "./lib/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_PATH ?? "./data/issuedoc.db",
+    url: process.env.DATABASE_PATH ?? "./data/asicom.db",
   },
 });

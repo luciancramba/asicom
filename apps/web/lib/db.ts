@@ -5,7 +5,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import * as schema from "./schema";
 
-const DB_PATH = process.env.DATABASE_PATH ?? "./data/issuedoc.db";
+const DB_PATH = process.env.DATABASE_PATH ?? "./data/asicom.db";
 const MIGRATIONS_DIR = resolve(process.cwd(), "drizzle");
 
 let instance: BetterSQLite3Database<typeof schema> | undefined;

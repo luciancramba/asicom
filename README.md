@@ -1,7 +1,6 @@
 # Asicom · Emitere asistată
 
-> Product brand: **Asicom** (Brand Book v1.0, `docs/brand.md`). `issuedoc` is the repo/internal
-> codename only — not user-facing.
+> Brand: **Asicom** — Brand Book v1.0 (`docs/brand.md`).
 
 Internal tool for an insurance brokerage assistant (Asicom / Asigest network). Client documents
 arrive as phone photos (buletin, talon, permis); Asicom extracts the data, validates it
@@ -44,5 +43,5 @@ npm run lint         # eslint across workspaces
 
 ## Status
 
-PR1 — scaffold: monorepo, shared spine, building skeleton. Auth + upload land in PR2.
-See `docs/specs/2026-06-05-issuedoc-mvp-design.md`.
+PR1 scaffold · brand · PR2 auth + upload + dosar create — done. Next: PR3 vision pipeline.
+See `docs/specs/2026-06-05-asicom-mvp-design.md`.

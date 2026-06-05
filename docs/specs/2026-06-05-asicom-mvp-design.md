@@ -1,4 +1,4 @@
-# Issuedoc MVP — design spec
+# Asicom MVP — design spec
 
 _Date: 2026-06-05 · Status: approved, in build (PR1)_
 
@@ -9,7 +9,7 @@ Client documents arrive as phone photos (buletin, talon, permis, ≤5 photos). T
 them into **Insuretech** (asigest.insuretech.ro), a web SPA. ~139 policies/month. The pain is
 retyping time + data-entry errors.
 
-Issuedoc: photos in → AI extraction → deterministic validation → **fișă de emitere** (fields in
+Asicom: photos in → AI extraction → deterministic validation → **fișă de emitere** (fields in
 Insuretech's order, source doc beside each, trust badges, fast copy / autofill) → issuance in
 ~2 min instead of ~15.
 
@@ -33,7 +33,7 @@ expert's trust.
   (auto-created by CNP: contact, vehicles, policies)
 - Emis: drag policy PDF → text-parse policy #/insurer/dates → registry; + one-click confirm
 - GDPR: raw images on filesystem (purged), structured data in SQLite (retained); purge timer
-- Deploy: Caddy + Node + SQLite on the VPS, issuedoc.cramba.ro, TLS
+- Deploy: Caddy + Node + SQLite on the VPS, asicom.cramba.ro, TLS
 
 **Deferred:**
 - **Output adapter implementation** — gated on Insuretech's answer (see §7)
@@ -47,7 +47,7 @@ TypeScript everywhere, so the field-map is shared between the fišă and the out
 (define once, use twice). Any other backend duplicates that mapping in two languages.
 
 ```
-issuedoc/
+asicom/
   apps/web/            Next.js 16 (App Router) + Tailwind 4 — upload, fišă, dashboard, API, vision
   apps/extension/      wxt MV3 — added only if the CSV path doesn't exist
   packages/shared/     THE SPINE — zod schemas · field registry · validators · confidence model
