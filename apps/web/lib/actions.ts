@@ -3,10 +3,12 @@
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
+import type { ExtractionResult } from "@asicom/shared";
 import { getCurrentUser } from "./auth";
 import { getDb, schema } from "./db";
 import { saveUpload } from "./storage";
 import { extractDocument } from "./vision";
+import { syncClientFromExtractions } from "./clients";
 
 const MAX_PHOTOS = 5;
 
@@ -55,6 +57,7 @@ export async function processDosar(formData: FormData): Promise<void> {
   db.delete(schema.extractions).where(eq(schema.extractions.dosarId, dosarId)).run();
 
   const photos = db.select().from(schema.photos).where(eq(schema.photos.dosarId, dosarId)).all();
+  const results: ExtractionResult[] = [];
   let extracted = 0;
   let failed = 0;
   for (const photo of photos) {
@@ -72,11 +75,20 @@ export async function processDosar(formData: FormData): Promise<void> {
         })
         .run();
       db.update(schema.photos).set({ docType: result.docType }).where(eq(schema.photos.id, photo.id)).run();
+      results.push(result);
       if (result.docType !== "junk") extracted += 1;
     } catch (err) {
       failed += 1;
       console.error(`[process] photo ${photo.id}:`, err instanceof Error ? err.message : err);
     }
+  }
+
+  // Auto-create / match the client + vehicle from what we read (keyed by a verified CNP).
+  // A sync failure must not fail the whole run — the extractions are already saved.
+  try {
+    syncClientFromExtractions(db, dosarId, results);
+  } catch (err) {
+    console.error(`[process] client sync ${dosarId}:`, err instanceof Error ? err.message : err);
   }
 
   db.update(schema.dosare)

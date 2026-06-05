@@ -15,7 +15,7 @@ export interface FieldResult {
   confidence: FieldConfidence;
 }
 
-interface Docs {
+export interface Docs {
   buletin?: Buletin;
   talon?: Talon;
   permis?: Permis;
@@ -129,15 +129,23 @@ function mergeParts<T extends object>(parts: (T | undefined)[]): T | undefined {
 }
 
 /**
- * Map a dosar's extractions onto the field registry (Insuretech order) and compute the
- * three-state confidence per field. This is the trust engine: green = machine-verified.
+ * Collect a dosar's extractions into one merged document per type (front + back photos combined).
+ * Shared by the fišă (confidence) and the client registry (auto-create / match by CNP).
  */
-export function buildFisa(extractions: ExtractionResult[]): FieldResult[] {
-  const docs: Docs = {
+export function collectDocs(extractions: ExtractionResult[]): Docs {
+  return {
     buletin: mergeParts(extractions.filter((e) => e.docType === "buletin").map((e) => e.buletin)),
     talon: mergeParts(extractions.filter((e) => e.docType === "talon").map((e) => e.talon)),
     permis: mergeParts(extractions.filter((e) => e.docType === "permis").map((e) => e.permis)),
   };
+}
+
+/**
+ * Map a dosar's extractions onto the field registry (Insuretech order) and compute the
+ * three-state confidence per field. This is the trust engine: green = machine-verified.
+ */
+export function buildFisa(extractions: ExtractionResult[]): FieldResult[] {
+  const docs = collectDocs(extractions);
   const cnp = docs.buletin?.cnp ? validateCnp(docs.buletin.cnp) : undefined;
   const ctx: Ctx = { ...docs, cnp };
 
