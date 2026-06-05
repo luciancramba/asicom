@@ -6,6 +6,7 @@ import { FisaView } from "@/components/fisa-view";
 import { ProcessButton } from "@/components/process-button";
 import { ProcessingBar } from "@/components/processing-bar";
 import { StatusAdvance } from "@/components/status-advance";
+import { PhotoClassification } from "@/components/photo-classification";
 import { processDosar } from "@/lib/actions";
 import { getDb, schema } from "@/lib/db";
 
@@ -97,6 +98,7 @@ export default async function DosarPage({
 
       {processed ? (
         <>
+          <PhotoClassification photos={photos.map((p) => ({ id: p.id, docType: p.docType }))} />
           <FisaView fields={fields} photoByDoc={photoByDoc} dosarId={dosar.id} />
           <StatusAdvance
             dosarId={dosar.id}

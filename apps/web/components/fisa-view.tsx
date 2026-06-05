@@ -251,7 +251,15 @@ export function FisaView({
                             </button>
                           </div>
                         ) : (
-                          <div className="truncate font-mono text-sm text-ink">{f.value ?? "—"}</div>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(f)}
+                            disabled={isPending}
+                            title="Apasă pentru a edita"
+                            className="-mx-1 block w-full truncate rounded px-1 text-left font-mono text-sm text-ink transition-colors hover:bg-asicom/5 disabled:opacity-50"
+                          >
+                            {f.value ?? <span className="text-ink/40">—</span>}
+                          </button>
                         )}
                       </div>
                       <ConfidenceBadge
