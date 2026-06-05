@@ -52,6 +52,17 @@ export default async function DosarPage({
   for (const p of photos) {
     if (p.docType && !photoByDoc[p.docType]) photoByDoc[p.docType] = p.id;
   }
+  // Per-photo extraction map for the inspection panel (click thumbnail → see fields for that photo).
+  const extractionByPhotoId = new Map<string, ExtractionResult>();
+  for (const r of extractionRows) {
+    if (r.photoId) extractionByPhotoId.set(r.photoId, JSON.parse(r.fieldsJson) as ExtractionResult);
+  }
+  const processedPhotos = photos.map((p) => ({
+    id: p.id,
+    docType: p.docType,
+    extraction: extractionByPhotoId.get(p.id) ?? null,
+  }));
+
   const overrides = parseOverrides(dosar.fieldOverridesJson);
   const fields = processed ? buildFisa(extractions, overrides) : [];
   const unverifiedCount = fields.filter((f) => f.value && f.confidence.state !== "verified").length;
@@ -98,7 +109,7 @@ export default async function DosarPage({
 
       {processed ? (
         <>
-          <PhotoClassification photos={photos.map((p) => ({ id: p.id, docType: p.docType }))} />
+          <PhotoClassification photos={processedPhotos} />
           <FisaView fields={fields} photoByDoc={photoByDoc} dosarId={dosar.id} />
           <StatusAdvance
             dosarId={dosar.id}
