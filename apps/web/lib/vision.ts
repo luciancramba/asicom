@@ -32,7 +32,15 @@ Reguli stricte:
 - Datele calendaristice se scriu în format ISO: AAAA-LL-ZZ.
 - Sexul: "M" sau "F".
 - CNP-ul are 13 cifre, fără spații.
-- Transcrie exact (diacritice, majuscule) ce scrie pe document.`;
+- Transcrie exact (diacritice, majuscule) ce scrie pe document.
+
+Talon — câmpuri (codurile de pe certificatul de înmatriculare):
+- "numarInmatriculare" = codul A
+- "vin" (serie șasiu) = codul E (17 caractere, fără I/O/Q)
+- "marca" = codul D.1, "model" = codul D.3, "anFabricatie" = codul B sau P.1
+- "masaMaxima" = codul F.1, "cilindree" = codul G sau P.1, "putereKw" = codul P.2, "combustibil" = codul P.3, "locuri" = codul S.1, "categorie" = codul J
+- "dataPrimaInmatriculare" = codul B (format ISO)
+- "serieCiv" = SERIA Cărții de Identitate a Vehiculului — un document SEPARAT de talon. Pe talonul nou se găsește la codul **Y** (rubrica „Seria și nr. CIV" sau echivalent). NU este același lucru cu „Numărul certificatului" (codul tipărit jos pe talon, format AXXXXXXXXB) — acela este seria talonului, nu a CIV. Dacă în imagine nu apare clar punctul Y / o rubrică etichetată „CIV", lasă câmpul gol (nu pune valoarea de la „Numărul certificatului").`;
 
 /**
  * The extraction schema is supplied to the model as a (non-strict) TOOL, not as a strict
