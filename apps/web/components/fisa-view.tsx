@@ -24,44 +24,108 @@ export function FisaView({
   const byId = new Map(fields.map((f) => [f.id, f]));
   const copyable = fields.filter((f) => f.value); // ordered, for auto-advance
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(copyable[0]?.id ?? null);
 
-  async function flash(id: string) {
+  /**
+   * Copy text to the clipboard reliably. Try the modern async API first; if that fails
+   * (focus, permission, or insecure context), fall back to a hidden textarea + execCommand,
+   * which works in iframes and on older Safari. Returns whether the copy actually succeeded
+   * — we surface that to the user rather than silently flashing "Copiat" on a failed copy.
+   */
+  async function writeClipboard(text: string): Promise<boolean> {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      /* fall through to legacy fallback */
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function flash(id: string) {
+    setErrorId((e) => (e === id ? null : e));
     setCopiedId(id);
     setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1200);
   }
 
+  function flashError(id: string) {
+    setCopiedId((c) => (c === id ? null : c));
+    setErrorId(id);
+    setTimeout(() => setErrorId((e) => (e === id ? null : e)), 2400);
+  }
+
   async function copyField(f: FieldResult) {
     if (!f.value) return;
-    try {
-      await navigator.clipboard.writeText(f.value);
-    } catch {
-      /* clipboard unavailable (insecure context) — ignore */
+    const ok = await writeClipboard(f.value);
+    if (ok) {
+      const idx = copyable.findIndex((x) => x.id === f.id);
+      setActiveId(copyable[idx + 1]?.id ?? null);
+      flash(f.id);
+    } else {
+      flashError(f.id);
     }
-    const idx = copyable.findIndex((x) => x.id === f.id);
-    setActiveId(copyable[idx + 1]?.id ?? null);
-    void flash(f.id);
   }
 
   async function copyAll() {
     const text = copyable.map((f) => `${f.label}: ${f.value}`).join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      /* ignore */
-    }
-    void flash("__all__");
+    const ok = await writeClipboard(text);
+    if (ok) flash("__all__");
+    else flashError("__all__");
   }
+
+  const verifiedCount = fields.filter((f) => f.confidence.state === "verified").length;
+  const totalWithValue = fields.filter((f) => f.value).length;
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-cloud px-4 py-3 text-xs text-ink/70">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span>
+            <span className="font-bold text-ok">✓</span> Verificat — confirmat de un calcul (ex. CNP)
+          </span>
+          <span>
+            <span className="font-bold text-warn">⚠</span> Verifică — extras corect, controlează cu ochiul
+          </span>
+          <span>
+            <span className="font-bold text-fail">✗</span> Eroare — nepotrivire sau invalid
+          </span>
+        </div>
+        <span className="font-mono">
+          {verifiedCount}/{totalWithValue} verificate
+        </span>
+      </div>
+
       <div className="flex justify-end">
         <button
           type="button"
           onClick={copyAll}
-          className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-asicom transition-colors hover:bg-cloud"
+          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+            errorId === "__all__"
+              ? "border-fail/40 bg-fail/5 text-fail"
+              : "border-line text-asicom hover:bg-cloud"
+          }`}
         >
-          {copiedId === "__all__" ? "✓ Copiat" : "Copiază tot"}
+          {copiedId === "__all__"
+            ? "✓ Copiat"
+            : errorId === "__all__"
+              ? "✗ Copierea a eșuat"
+              : "Copiază tot"}
         </button>
       </div>
 
@@ -101,9 +165,13 @@ export function FisaView({
                         onClick={() => copyField(f)}
                         disabled={!f.value}
                         aria-label={`Copiază ${f.label}`}
-                        className="w-20 rounded-md border border-line px-2 py-1 text-xs font-medium text-asicom transition-colors hover:bg-cloud disabled:opacity-30"
+                        className={`w-20 rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-30 ${
+                          errorId === f.id
+                            ? "border-fail/40 bg-fail/5 text-fail"
+                            : "border-line text-asicom hover:bg-cloud"
+                        }`}
                       >
-                        {copiedId === f.id ? "✓ Copiat" : "Copiază"}
+                        {copiedId === f.id ? "✓ Copiat" : errorId === f.id ? "✗ Eroare" : "Copiază"}
                       </button>
                     </li>
                   );
