@@ -43,13 +43,39 @@ Coordonate (bbox) — pe lângă valorile extrase, completează „bbox" cu coor
 - Înălțimea unui rând de text este de obicei 0.02-0.04 (2-4% din înălțimea fotografiei). Nu pune h>0.10 pentru câmpuri pe o singură linie.
 - Pentru câmpuri care nu apar pe imagine sau nu le poți localiza, omite-le din bbox.
 
-Talon — câmpuri (codurile de pe certificatul de înmatriculare):
-- "numarInmatriculare" = codul A
-- "vin" (serie șasiu) = codul E (17 caractere, fără I/O/Q)
-- "marca" = codul D.1, "model" = codul D.3, "anFabricatie" = codul B sau P.1
-- "masaMaxima" = codul F.1, "cilindree" = codul G sau P.1, "putereKw" = codul P.2, "combustibil" = codul P.3, "locuri" = codul S.1, "categorie" = codul J
-- "dataPrimaInmatriculare" = codul B (format ISO)
-- "serieCiv" = SERIA Cărții de Identitate a Vehiculului — un document SEPARAT de talon. Pe talonul nou se găsește la codul **Y** (rubrica „Seria și nr. CIV" sau echivalent). NU este același lucru cu „Numărul certificatului" (codul tipărit jos pe talon, format AXXXXXXXXB) — acela este seria talonului, nu a CIV. Dacă în imagine nu apare clar punctul Y / o rubrică etichetată „CIV", lasă câmpul gol (nu pune valoarea de la „Numărul certificatului").`;
+Talon — câmpuri pe certificatul de înmatriculare (CI) românesc. Folosește codurile EU-armonizate de pe document ca ancore — sunt tipărite înaintea fiecărei valori (litera A, B, D.1, etc.). Bbox-ul trebuie să încadreze VALOAREA, nu litera/eticheta.
+
+  Câmpuri principale:
+- "numarInmatriculare" = codul **A**. Format: 2 litere județ + 2-3 cifre + 3 litere (ex.: „AB-19-MXL", „CJ-14-XMF", „B-123-ABC"). Păstrează exact cum scrie pe talon, cu sau fără cratime.
+- "vin" (serie șasiu) = codul **E**. EXACT 17 caractere alfanumerice, fără literele I, O, Q. Atenție mare la transcriere — confuzia 0/O, 1/I, B/8 e cea mai frecventă greșeală. Numără caracterele înainte de a confirma.
+- "marca" = codul **D.1**. Producătorul vehiculului (ex.: „MERCEDES-BENZ", „RENAULT", „AUDI", „DACIA"). NU este modelul.
+- "model" = codul **D.3** (denumirea comercială). Dacă D.3 nu există pe talon, folosește D.2 (tipul). Exemple: „B 180 CDI", „SYMBOL", „LOGAN". NU este marca.
+- "anFabricatie" = anul fabricației — NU este garantat ca cod separat. Dacă talonul nu are explicit „An fabricație", folosește anul din **dataPrimaInmatriculare** (codul B) sau lasă gol. Format: AAAA.
+- "dataPrimaInmatriculare" = codul **B**. Data primei înmatriculări a vehiculului. Format ISO AAAA-LL-ZZ.
+- "categorie" = codul **J**. Categoria vehiculului (ex.: „M1", „AUTOTURISM M1", „N1"). Include și descrierea dacă apare.
+
+  Câmpuri motor:
+- "cilindree" = codul **P.1** (capacitate cilindrică, cm³). DOAR P.1. Codul G este masa proprie, NU cilindreea — nu confunda.
+- "putereKw" = codul **P.2** (puterea maximă netă, kW). Doar numărul în kW, NU și CP-urile dacă sunt afișate separat.
+- "combustibil" = codul **P.3** (tipul de combustibil). Exemple: „BENZINA", „MOTORINA", „GPL", „ELECTRIC", „HIBRID".
+
+  Câmpuri masă și locuri:
+- "masaMaxima" = codul **F.1** (masa maximă tehnic admisă, kg). DOAR F.1. NU F.2 (masa de înmatriculare) și NU G (masa proprie).
+- "locuri" = codul **S.1** (numărul locurilor pe scaune, incluzând conducătorul).
+
+  Serie CIV (atenție mare — câmp problematic):
+- "serieCiv" = SERIA Cărții de Identitate a Vehiculului — un document SEPARAT de talon. Pe talonul nou apare la codul **Y**, etichetată „Seria și nr. CIV" sau „CIV".
+- **Format obligatoriu**: o literă majusculă urmată de exact 6 cifre (ex.: „G502721", „R262160", „A123456"). Înainte de a completa, VERIFICĂ că valoarea se potrivește cu acest model. Dacă nu se potrivește, LASĂ CÂMPUL GOL.
+- NU confunda cu:
+  • „Numărul certificatului" (jos pe talon, format AXXXXXXXXB cu literă+7cifre+literă) — este seria TALONULUI, nu a CIV.
+  • Codul **Z** „SRPCIV [Județ]" (ex.: „SRPCIV Alba", „SRPCIV Cluj") — este SUBUNITATEA EMITENTĂ (instituția RAR care a emis talonul), NU serieCiv. SRPCIV nu e niciodată un număr.
+  • Codul **K** (numărul de omologare, format „e1*2001/116*XXXX*XX") — NU este serieCiv.
+- Dacă rubrica Y nu se vede clar sau valoarea găsită nu respectă formatul „1 literă + 6 cifre", LASĂ CÂMPUL GOL — buildFisa pune implicit „A000000". Mai bine gol decât greșit.
+
+  Atenție generală pe talon:
+- Tipul/Variantă (codul D.2) NU este un câmp separat în schemă; rămâne în model/marca după caz.
+- Culoarea (codul R), număr omologare (K), data eliberării (I), valabilitate (H) NU se extrag.
+- Talonul poate fi fotografiat în orientare landscape (sideways); citește valorile în ordinea lor reală pe document, nu după orientarea fotografiei.`;
 
 /**
  * The extraction schema is supplied to the model as a (non-strict) TOOL, not as a strict
