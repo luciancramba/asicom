@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 const SURFACES: {
   href: string;
   title: string;
-  audience: "broker" | "client" | "public";
+  audience: "broker" | "client" | "public" | "platform";
   what: string;
   why: string;
   icon: string;
@@ -55,12 +55,31 @@ const SURFACES: {
       "Homepage asicom.cramba.ro pentru prospecți. Hero, value props, cum funcționează, testimonial Tripon, prețuri.",
     why: 'Vândem prospectului promisiunea — „Documentul devine poliță".',
   },
+  {
+    href: "/comparator",
+    title: "Comparator RCA",
+    audience: "client",
+    icon: "⚖️",
+    what:
+      "Trei cotații RCA puse cap la cap pentru AB-17-VIP, cu scor AI și argument personalizat pe profilul clientului (vârstă, bonus-malus, istoric, județ).",
+    why: "Vândem clientului încrederea — decizia complexă devine 1 click.",
+  },
+  {
+    href: "/cramba-admin",
+    title: "Cramba Admin",
+    audience: "platform",
+    icon: "🏢",
+    what:
+      "Tabloul de bord al platformei: 8 brokeri activi, MRR 2.480 €, pipeline brokeri noi, sănătate sistem, integrări asigurători.",
+    why: "Vândem viitorului Cramba scala — Asicom ca SaaS pentru rețeaua de brokeri.",
+  },
 ];
 
 const AUDIENCE_LABEL: Record<string, { ro: string; cls: string }> = {
   broker: { ro: "BROKER", cls: "bg-asicom/10 text-asicom" },
   client: { ro: "CLIENT", cls: "bg-ok/10 text-ok" },
   public: { ro: "PROSPECT", cls: "bg-warn/10 text-warn" },
+  platform: { ro: "CRAMBA", cls: "bg-ink/10 text-ink" },
 };
 
 export default function PreviewHub() {
@@ -78,8 +97,8 @@ export default function PreviewHub() {
           <p className="text-xs font-bold uppercase tracking-[0.28em] text-asicom-mid">Roadmap</p>
           <h1 className="font-display text-3xl font-light text-ink">Vizionează viitorul</h1>
           <p className="mt-1 text-sm text-ink/60">
-            5 suprafețe demo care arată cum se conectează emitere → relație → reînnoire → daună →
-            scale.
+            7 suprafețe demo care arată cum se conectează emitere → relație → reînnoire →
+            daună → decizie → scale.
           </p>
         </div>
       </div>
