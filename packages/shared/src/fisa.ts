@@ -25,8 +25,19 @@ interface Ctx extends Docs {
   cnp?: CnpDecoded;
 }
 
+/**
+ * Normalize a name for cross-document comparison: fold diacritics, lowercase, and treat hyphen
+ * and whitespace as the same separator. Real documents disagree on formatting — a buletin reads
+ * "LUCIAN-NICOLAE" while the permis reads "Lucian Nicolae", and an older permis drops diacritics
+ * ("STEFAN" vs "Ștefan"). Those are the same name; only a genuine difference should fail the check.
+ */
 const normalizeName = (s: string | undefined): string =>
-  (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  (s ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, " ");
 
 function flattenAddress(adr: Buletin["adresa"]): string | null {
   if (!adr) return null;
@@ -97,14 +108,35 @@ function computeConfidence(field: FieldDef, value: string | null, ctx: Ctx): Fie
 }
 
 /**
+ * Merge several extractions of the same document type into one — first non-empty value per field
+ * wins. A client often photographs both sides of a document (the back of a permis carries the
+ * category table, the front carries the name), so the name we cross-check against may live on a
+ * different photo than the one `.find()` would pick. Single-extraction inputs pass through unchanged.
+ */
+function mergeParts<T extends object>(parts: (T | undefined)[]): T | undefined {
+  const present = parts.filter((p): p is T => p != null);
+  if (present.length <= 1) return present[0];
+  const out: Record<string, unknown> = {};
+  for (const part of present) {
+    for (const [key, value] of Object.entries(part)) {
+      const current = out[key];
+      if ((current == null || current === "") && value != null && value !== "") {
+        out[key] = value;
+      }
+    }
+  }
+  return out as T;
+}
+
+/**
  * Map a dosar's extractions onto the field registry (Insuretech order) and compute the
  * three-state confidence per field. This is the trust engine: green = machine-verified.
  */
 export function buildFisa(extractions: ExtractionResult[]): FieldResult[] {
   const docs: Docs = {
-    buletin: extractions.find((e) => e.docType === "buletin")?.buletin,
-    talon: extractions.find((e) => e.docType === "talon")?.talon,
-    permis: extractions.find((e) => e.docType === "permis")?.permis,
+    buletin: mergeParts(extractions.filter((e) => e.docType === "buletin").map((e) => e.buletin)),
+    talon: mergeParts(extractions.filter((e) => e.docType === "talon").map((e) => e.talon)),
+    permis: mergeParts(extractions.filter((e) => e.docType === "permis").map((e) => e.permis)),
   };
   const cnp = docs.buletin?.cnp ? validateCnp(docs.buletin.cnp) : undefined;
   const ctx: Ctx = { ...docs, cnp };

@@ -62,4 +62,25 @@ describe("buildFisa", () => {
     expect(find(f, "client.cnp").confidence.state).toBe("unverified");
     expect(find(f, "client.telefon").confidence.state).toBe("unverified");
   });
+
+  it("treats hyphen/space and diacritics as equal when cross-checking names", () => {
+    const ex: ExtractionResult[] = [
+      { docType: "buletin", buletin: { nume: "Ștefan", prenume: "LUCIAN-NICOLAE" } },
+      { docType: "permis", permis: { nume: "STEFAN", prenume: "Lucian Nicolae" } },
+    ];
+    const f = buildFisa(ex);
+    expect(find(f, "client.nume").confidence.state).toBe("verified");
+    expect(find(f, "client.prenume").confidence.state).toBe("verified");
+  });
+
+  it("cross-checks the name against a permis split across photos (front + back)", () => {
+    const ex: ExtractionResult[] = [
+      { docType: "buletin", buletin: { nume: "TRIPON", prenume: "LUCIAN-NICOLAE" } },
+      { docType: "permis", permis: { categorii: ["B"] } }, // back side — no name
+      { docType: "permis", permis: { nume: "Tripon", prenume: "Lucian Nicolae" } }, // front side
+    ];
+    const f = buildFisa(ex);
+    expect(find(f, "client.nume").confidence.state).toBe("verified");
+    expect(find(f, "client.prenume").confidence.state).toBe("verified");
+  });
 });
