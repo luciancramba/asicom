@@ -1,0 +1,31 @@
+# Keep the build context small and the production image clean.
+node_modules
+**/node_modules
+.next
+**/.next
+.git
+.github
+**/dist
+**/build
+**/.DS_Store
+
+# Local-only data — never bake into the image.
+apps/web/data
+.env*
+**/.env*
+
+# Editor / OS junk
+.vscode
+.idea
+*.swp
+*.swo
+
+# Coverage / test outputs
+coverage
+**/coverage
+**/*.log
+
+# Drizzle migrations DIRECTORY is needed (we copy it explicitly); but
+# generated metadata snapshots that are huge can stay out — they're
+# regenerated when needed.
+# (kept here as a reminder; we DO want drizzle/*.sql in the image)

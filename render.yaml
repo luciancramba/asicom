@@ -1,0 +1,49 @@
+# Render.com infrastructure-as-code blueprint.
+#
+# Connect this repo to Render once via the dashboard, and Render reads this file
+# on every push to `main` to provision the service, the disk, and any env vars
+# whose values aren't secrets. Secrets (ANTHROPIC_API_KEY, password hash, session
+# secret) are set by hand in the dashboard the first time and persist across deploys.
+#
+# Cost: ~$7/mo for the Starter web service + ~$0.25/mo per GB of disk (1 GB = $0.25).
+
+services:
+  - type: web
+    name: asicom
+    runtime: docker
+    plan: starter
+    region: frankfurt # closest to Romania
+    branch: main # auto-deploy on push to main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /login
+    autoDeploy: true
+
+    disk:
+      name: asicom-data
+      mountPath: /data
+      sizeGB: 1
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: DATABASE_PATH
+        value: /data/asicom.db
+      - key: UPLOAD_DIR
+        value: /data/uploads
+      - key: ASICOM_USER
+        value: tripon
+      - key: PURGE_AFTER_EMIS_DAYS
+        value: "14"
+
+      # Secrets — set these in the Render dashboard on first deploy.
+      # sync: false tells Render "don't manage this value from the blueprint;
+      # read it from the dashboard". After the first set, blueprint pushes
+      # leave the value untouched.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ASICOM_PASSWORD_HASH
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
