@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@asicom/shared"],
   // Native module — don't bundle it into the server build.
   serverExternalPackages: ["better-sqlite3"],
+  experimental: {
+    // Up to 5 phone photos per dosar exceed the 1 MB default for Server Action bodies.
+    serverActions: { bodySizeLimit: "30mb" },
+  },
 };
 
 export default nextConfig;
