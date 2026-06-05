@@ -22,7 +22,5 @@ export function validateVin(vin: string): FieldConfidence {
     : failed("VIN must be 17 chars and exclude I, O, Q");
 }
 
-/** Date sanity (plausible range, expiry in the future). */
-export function validateDate(_iso: string): FieldConfidence {
-  return unverified("Date validation not yet implemented");
-}
+// Date validators (expiry-in-future, birth-date sanity) + ISO helpers.
+export * from "./dates";

@@ -1,4 +1,6 @@
-import { z } from "zod";
+// Zod v4 API (shipped under this subpath by zod 3.25+) — required for @anthropic-ai/sdk's
+// zodOutputFormat, which types schemas against zod-core. Drop-in for our object/string/enum use.
+import { z } from "zod/v4";
 
 /** What pass-1 vision classifies each photo as. */
 export const DocType = z.enum(["buletin", "talon", "permis", "policy", "junk"]);
@@ -93,3 +95,17 @@ export const SCHEMA_BY_DOC_TYPE = {
   permis: PermisSchema,
   policy: PolicySchema,
 } as const;
+
+/**
+ * One vision call per image returns this: the classified `docType` plus the fields for that
+ * type only (fill the matching sub-object, leave the others absent). Used as the structured
+ * output schema for the extraction call.
+ */
+export const ExtractionResultSchema = z.object({
+  docType: DocType,
+  buletin: BuletinSchema.optional(),
+  talon: TalonSchema.optional(),
+  permis: PermisSchema.optional(),
+  policy: PolicySchema.optional(),
+});
+export type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
