@@ -298,17 +298,18 @@ function BarChart() {
     { month: "iun", value: 2480 },
   ];
   const max = Math.max(...data.map((d) => d.value));
+  const MAX_BAR_PX = 160;
   return (
-    <div className="flex items-end gap-3 h-40">
+    <div className="flex items-end gap-3" style={{ minHeight: `${MAX_BAR_PX + 36}px` }}>
       {data.map((d) => (
-        <div key={d.month} className="flex flex-1 flex-col items-center gap-1">
+        <div key={d.month} className="flex flex-1 flex-col items-center">
           <span className="text-[10px] font-mono text-ink/55">{d.value}€</span>
           <div
-            className="w-full rounded-t bg-asicom-gradient transition-all hover:opacity-80"
-            style={{ height: `${(d.value / max) * 100}%` }}
+            className="mt-1 w-full rounded-t bg-asicom-gradient transition-all hover:opacity-80"
+            style={{ height: `${Math.round((d.value / max) * MAX_BAR_PX)}px` }}
             title={`${d.value}€`}
           />
-          <span className="text-[10px] uppercase tracking-wide text-ink/50">{d.month}</span>
+          <span className="mt-1 text-[10px] uppercase tracking-wide text-ink/50">{d.month}</span>
         </div>
       ))}
     </div>
