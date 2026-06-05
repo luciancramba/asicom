@@ -4,13 +4,21 @@ import { buildFisa, type ExtractionResult } from "@asicom/shared";
 import { StatusChip } from "@/components/status-chip";
 import { FisaView } from "@/components/fisa-view";
 import { ProcessButton } from "@/components/process-button";
+import { ProcessingBar } from "@/components/processing-bar";
 import { processDosar } from "@/lib/actions";
 import { getDb, schema } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export default async function DosarPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DosarPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ err?: string; warn?: string }>;
+}) {
   const { id } = await params;
+  const { err, warn } = await searchParams;
   const db = getDb();
 
   const dosar = db.select().from(schema.dosare).where(eq(schema.dosare.id, id)).get();
@@ -32,7 +40,6 @@ export default async function DosarPage({ params }: { params: Promise<{ id: stri
   for (const p of photos) {
     if (p.docType && !photoByDoc[p.docType]) photoByDoc[p.docType] = p.id;
   }
-
   const fields = processed ? buildFisa(extractions) : [];
 
   return (
@@ -45,15 +52,35 @@ export default async function DosarPage({ params }: { params: Promise<{ id: stri
         <StatusChip status={dosar.status} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink/60">
-          {photos.length} {photos.length === 1 ? "document încărcat" : "documente încărcate"}.
-        </p>
-        <form action={processDosar}>
-          <input type="hidden" name="dosarId" value={dosar.id} />
+      {err === "nokey" ? (
+        <div className="rounded-lg border border-fail/30 bg-fail/5 px-4 py-3 text-sm text-fail">
+          Cheia <span className="font-mono">ANTHROPIC_API_KEY</span> lipsește. Adaug-o în{" "}
+          <span className="font-mono">apps/web/.env.local</span> și repornește serverul
+          (<span className="font-mono">npm run dev</span>), apoi reîncearcă.
+        </div>
+      ) : null}
+      {err === "extract" ? (
+        <div className="rounded-lg border border-fail/30 bg-fail/5 px-4 py-3 text-sm text-fail">
+          Niciun document nu a putut fi citit. Verifică pozele sau cheia API (detalii în consola serverului).
+        </div>
+      ) : null}
+      {warn ? (
+        <div className="rounded-lg border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-warn">
+          {warn} {Number(warn) === 1 ? "document nu a putut fi citit" : "documente nu au putut fi citite"};
+          restul apar mai jos.
+        </div>
+      ) : null}
+
+      <form action={processDosar} className="flex flex-col gap-3">
+        <input type="hidden" name="dosarId" value={dosar.id} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink/60">
+            {photos.length} {photos.length === 1 ? "document încărcat" : "documente încărcate"}.
+          </p>
           <ProcessButton processed={processed} />
-        </form>
-      </div>
+        </div>
+        <ProcessingBar count={photos.length} />
+      </form>
 
       {processed ? (
         <FisaView fields={fields} photoByDoc={photoByDoc} />

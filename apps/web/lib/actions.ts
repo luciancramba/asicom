@@ -44,6 +44,9 @@ export async function processDosar(formData: FormData): Promise<void> {
   const dosarId = String(formData.get("dosarId") ?? "");
   if (!dosarId) redirect("/");
 
+  // No silent failures: if the key is missing, say so instead of redirecting to an unchanged page.
+  if (!process.env.ANTHROPIC_API_KEY) redirect(`/dosar/${dosarId}?err=nokey`);
+
   const db = getDb();
   const dosar = db.select().from(schema.dosare).where(eq(schema.dosare.id, dosarId)).get();
   if (!dosar) redirect("/");
@@ -53,6 +56,7 @@ export async function processDosar(formData: FormData): Promise<void> {
 
   const photos = db.select().from(schema.photos).where(eq(schema.photos.dosarId, dosarId)).all();
   let extracted = 0;
+  let failed = 0;
   for (const photo of photos) {
     if (photo.purgedAt) continue;
     try {
@@ -70,6 +74,7 @@ export async function processDosar(formData: FormData): Promise<void> {
       db.update(schema.photos).set({ docType: result.docType }).where(eq(schema.photos.id, photo.id)).run();
       if (result.docType !== "junk") extracted += 1;
     } catch (err) {
+      failed += 1;
       console.error(`[process] photo ${photo.id}:`, err instanceof Error ? err.message : err);
     }
   }
@@ -82,5 +87,9 @@ export async function processDosar(formData: FormData): Promise<void> {
     .where(eq(schema.dosare.id, dosarId))
     .run();
 
-  redirect(`/dosar/${dosarId}`);
+  const params = new URLSearchParams();
+  if (extracted === 0) params.set("err", "extract");
+  else if (failed > 0) params.set("warn", String(failed));
+  const qs = params.toString();
+  redirect(`/dosar/${dosarId}${qs ? `?${qs}` : ""}`);
 }

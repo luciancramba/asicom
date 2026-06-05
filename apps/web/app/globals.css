@@ -25,6 +25,16 @@
   background-image: linear-gradient(135deg, var(--color-asicom-light), var(--color-asicom));
 }
 
+/* Indeterminate loading-bar sweep (processing fišă) */
+@keyframes asicom-loading {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
 body {
   background: #ffffff;
   color: var(--color-ink);
