@@ -7,6 +7,7 @@
   --color-asicom-light: #2e8fe6; /* gradient, hover, secundar */
   --color-ink: #1a1a1a; /* text de bază */
   --color-cloud: #f4f6fa; /* fundaluri secțiuni, carduri */
+  --color-line: #dde4ef; /* neutral hairline — borders, dividers */
 
   /* Functional — UI only, never in the logo (Brand Book §3) */
   --color-ok: #1f8a5b; /* ✓ date validate */
