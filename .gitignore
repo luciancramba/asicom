@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Builds
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local data — raw photos, SQLite DB (GDPR: never commit personal data)
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+uploads/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Editor / OS
+.DS_Store
+*.log
+.idea/
+.vscode/
