@@ -1,0 +1,14 @@
+# Issuedoc — single VPS, automatic TLS via Let's Encrypt.
+# Deploy: `caddy run --config infra/Caddyfile` (or as a systemd service).
+
+issuedoc.cramba.ro {
+	encode gzip
+
+	# Single-user gate option for the very first demo (uncomment, then
+	# `caddy hash-password` to generate the hash). Real app-level auth lands in PR2.
+	# basic_auth {
+	# 	tripon <bcrypt-hash>
+	# }
+
+	reverse_proxy 127.0.0.1:3000
+}
