@@ -42,8 +42,10 @@ export default function InboxPreview() {
         <StatCard label="Timp mediu răspuns" value="3m 12s" hint="după AI assist" accent="text-ok" />
       </div>
 
-      {/* Main: 3-column inbox layout */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[18rem_1fr_18rem]">
+      {/* Main: 3-column inbox layout. minmax(0,1fr) lets the middle column actually grow into
+          the leftover space — without the minmax, the text-content inside the conversation
+          header was constraining it to fit-content. Narrower side columns at sm; full size at lg. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[15rem_minmax(0,1fr)_15rem] lg:grid-cols-[17rem_minmax(0,1fr)_19rem]">
         {/* Left: conversation list */}
         <aside className="overflow-hidden rounded-xl border border-line bg-white">
           <header className="border-b border-line bg-cloud px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-asicom">
@@ -95,13 +97,15 @@ export default function InboxPreview() {
 
         {/* Center: open conversation */}
         <main className="flex flex-col overflow-hidden rounded-xl border border-line bg-white">
-          <header className="flex items-center justify-between border-b border-line bg-cloud px-4 py-2.5">
-            <div>
-              <div className="text-sm font-medium text-ink">TRIPON LUCIAN-NICOLAE</div>
-              <div className="font-mono text-[11px] text-ink/50">0745 123 456 · WhatsApp Business</div>
+          <header className="flex items-center justify-between gap-3 border-b border-line bg-cloud px-4 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium text-ink">TRIPON LUCIAN-NICOLAE</div>
+              <div className="truncate font-mono text-[11px] text-ink/50">
+                0745 123 456 · WhatsApp Business
+              </div>
             </div>
-            <span className="rounded-full bg-asicom/10 px-2 py-0.5 text-[10px] font-medium text-asicom">
-              Client activ · RCA · PAD
+            <span className="shrink-0 rounded-full bg-asicom/10 px-2 py-0.5 text-[10px] font-medium text-asicom">
+              RCA · PAD
             </span>
           </header>
 
