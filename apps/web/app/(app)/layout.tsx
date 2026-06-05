@@ -19,6 +19,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/" className="flex items-center">
           <AsicomLogo className="h-8 w-auto text-white" />
         </Link>
+        <nav className="flex items-center gap-5 text-sm text-white/85">
+          <Link href="/" className="transition-colors hover:text-white">
+            Dosare
+          </Link>
+          <Link href="/clienti" className="transition-colors hover:text-white">
+            Clienți
+          </Link>
+        </nav>
         <div className="flex items-center gap-4 text-sm text-white/85">
           <span className="hidden sm:inline">{user}</span>
           <form action={logoutAction}>
