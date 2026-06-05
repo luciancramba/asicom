@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import type { ExtractionResult } from "@asicom/shared";
+import { rotatePhoto } from "@/lib/actions";
 
 interface ProcessedPhoto {
   id: string;
@@ -95,8 +96,31 @@ function detectTalonConflicts(photos: ProcessedPhoto[]): { plates: string[]; vin
  * mistake). Closes the "I uploaded 4 but only 2 are in the fišă" perception — nothing disappears
  * silently and the broker can drill into every photo's contribution.
  */
-export function PhotoClassification({ photos }: { photos: ProcessedPhoto[] }) {
+export function PhotoClassification({
+  photos,
+  dosarId,
+}: {
+  photos: ProcessedPhoto[];
+  dosarId: string;
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  function onRotate(photoId: string) {
+    setRotatingId(photoId);
+    const fd = new FormData();
+    fd.set("dosarId", dosarId);
+    fd.set("photoId", photoId);
+    startTransition(async () => {
+      try {
+        await rotatePhoto(fd);
+      } finally {
+        setRotatingId((p) => (p === photoId ? null : p));
+      }
+    });
+  }
+
   if (photos.length === 0) return null;
 
   const counts = photos.reduce<Record<string, number>>((acc, p) => {
@@ -146,23 +170,37 @@ export function PhotoClassification({ photos }: { photos: ProcessedPhoto[] }) {
         {photos.map((p) => {
           const label = p.docType ? LABELS[p.docType] : null;
           const isOpen = openId === p.id;
+          const isRotating = rotatingId === p.id;
           return (
-            <button
-              type="button"
+            <div
               key={p.id}
-              onClick={() => setOpenId((o) => (o === p.id ? null : p.id))}
-              className={`flex flex-col gap-1.5 rounded-lg p-1 text-left transition-colors hover:bg-cloud ${
+              className={`relative flex flex-col gap-1.5 rounded-lg p-1 transition-colors ${
                 isOpen ? "bg-cloud ring-1 ring-asicom/40" : ""
               }`}
             >
-              <div className="relative overflow-hidden rounded-lg border border-line bg-cloud">
+              <button
+                type="button"
+                onClick={() => setOpenId((o) => (o === p.id ? null : p.id))}
+                className="block overflow-hidden rounded-lg border border-line bg-cloud transition-opacity hover:opacity-90"
+                aria-label={`Vezi detalii pentru ${label?.ro ?? "poza"}`}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/api/photo/${p.id}`}
                   alt={label?.ro ?? "document"}
                   className="aspect-square w-full object-cover"
                 />
-              </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRotate(p.id)}
+                disabled={isRotating}
+                aria-label="Rotește 90° dreapta"
+                title="Rotește 90° (corectează orientarea)"
+                className="absolute right-2 top-2 rounded-md bg-ink/70 px-1.5 py-0.5 text-xs font-medium text-white opacity-80 transition-opacity hover:opacity-100 disabled:opacity-40"
+              >
+                {isRotating ? "…" : "↻"}
+              </button>
               <span
                 className={`self-start rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${
                   label?.cls ?? "border-line text-ink/50"
@@ -170,7 +208,7 @@ export function PhotoClassification({ photos }: { photos: ProcessedPhoto[] }) {
               >
                 {label?.ro ?? p.docType ?? "necunoscut"}
               </span>
-            </button>
+            </div>
           );
         })}
       </div>

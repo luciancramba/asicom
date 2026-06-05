@@ -3,14 +3,23 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { eq } from "drizzle-orm";
-import type { ExtractionResult, FieldOverride, FieldOverrides } from "@asicom/shared";
+import type {
+  BBox,
+  ExtractionResult,
+  FieldOverride,
+  FieldOverrides,
+} from "@asicom/shared";
 import { FIELD_REGISTRY } from "@asicom/shared";
 import { getCurrentUser } from "./auth";
 import { getDb, schema } from "./db";
 import { saveUpload } from "./storage";
 import { extractDocument } from "./vision";
 import { syncClientFromExtractions } from "./clients";
+
+const execFileAsync = promisify(execFile);
 
 const MAX_PHOTOS = 6;
 
@@ -220,4 +229,87 @@ export async function advanceDosarStatus(formData: FormData): Promise<void> {
   db.update(schema.dosare).set(patch).where(eq(schema.dosare.id, dosarId)).run();
   revalidatePath(`/dosar/${dosarId}`);
   revalidatePath("/"); // dashboard counts change
+}
+
+// ---------- Photo rotation ----------
+
+/** Rotate a normalized bbox by 90° clockwise. Coordinate system: top-left origin, [0,1]. */
+function rotateBBox90CW(b: BBox): BBox {
+  return {
+    x: Math.max(0, Math.min(1, 1 - b.y - b.h)),
+    y: Math.max(0, Math.min(1, b.x)),
+    w: Math.max(0, Math.min(1, b.h)),
+    h: Math.max(0, Math.min(1, b.w)),
+  };
+}
+
+/**
+ * Rotate one uploaded photo 90° clockwise — IMAGE BYTES + EXTRACTION BBOXES together so the
+ * spotlight + crops remain aligned with the new orientation without another vision call.
+ * Phones often capture talons / passports in landscape, and Claude's bbox accuracy collapses
+ * on rotated documents (it sees the rotated raster, not the broker's mental "right way up").
+ */
+export async function rotatePhoto(formData: FormData): Promise<void> {
+  if (!(await getCurrentUser())) redirect("/login");
+  const dosarId = String(formData.get("dosarId") ?? "");
+  const photoId = String(formData.get("photoId") ?? "");
+  if (!dosarId || !photoId) return;
+
+  const db = getDb();
+  const photo = db.select().from(schema.photos).where(eq(schema.photos.id, photoId)).get();
+  if (!photo || !photo.filepath) return;
+  if (photo.dosarId !== dosarId) return; // tampering / wrong dosar
+
+  // Rotate the file in place. Prefer jpegtran for JPEG (lossless), fall back to sips (macOS
+  // native, works for any format). Production VPS will need libjpeg-turbo or imagemagick.
+  const ext = photo.filepath.slice(photo.filepath.lastIndexOf(".")).toLowerCase();
+  const isJpeg = ext === ".jpg" || ext === ".jpeg";
+  try {
+    if (isJpeg) {
+      // jpegtran can't overwrite the input directly — write to .tmp, then mv.
+      const tmp = `${photo.filepath}.rot.tmp`;
+      await execFileAsync("jpegtran", [
+        "-rotate",
+        "90",
+        "-copy",
+        "none",
+        "-outfile",
+        tmp,
+        photo.filepath,
+      ]);
+      await execFileAsync("mv", [tmp, photo.filepath]);
+    } else {
+      await execFileAsync("sips", ["-r", "90", photo.filepath]);
+    }
+  } catch (err) {
+    console.error(`[rotate] photo ${photoId}:`, err instanceof Error ? err.message : err);
+    return; // don't touch the extraction if the file rotation failed
+  }
+
+  // Rotate the stored extraction's bboxes by the same 90° CW so spotlight + crops stay aligned.
+  const extraction = db
+    .select()
+    .from(schema.extractions)
+    .where(eq(schema.extractions.photoId, photoId))
+    .get();
+  if (extraction?.fieldsJson) {
+    try {
+      const parsed = JSON.parse(extraction.fieldsJson) as ExtractionResult;
+      if (parsed.bbox) {
+        const next: Record<string, BBox> = {};
+        for (const [k, b] of Object.entries(parsed.bbox)) {
+          next[k] = rotateBBox90CW(b as BBox);
+        }
+        parsed.bbox = next;
+        db.update(schema.extractions)
+          .set({ fieldsJson: JSON.stringify(parsed) })
+          .where(eq(schema.extractions.id, extraction.id))
+          .run();
+      }
+    } catch (err) {
+      console.error(`[rotate] bbox transform ${photoId}:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  revalidatePath(`/dosar/${dosarId}`);
 }

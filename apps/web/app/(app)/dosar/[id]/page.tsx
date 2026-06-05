@@ -117,7 +117,7 @@ export default async function DosarPage({
 
       {processed ? (
         <>
-          <PhotoClassification photos={processedPhotos} />
+          <PhotoClassification photos={processedPhotos} dosarId={dosar.id} />
           <FisaView fields={fields} photosByDoc={photosByDoc} dosarId={dosar.id} />
           <StatusAdvance
             dosarId={dosar.id}
