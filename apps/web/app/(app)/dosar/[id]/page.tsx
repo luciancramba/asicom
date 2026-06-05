@@ -7,6 +7,8 @@ import { ProcessButton } from "@/components/process-button";
 import { ProcessingBar } from "@/components/processing-bar";
 import { StatusAdvance } from "@/components/status-advance";
 import { PhotoClassification } from "@/components/photo-classification";
+import { PolicyUpload } from "@/components/policy-upload";
+import { PolicyCard } from "@/components/policy-card";
 import { processDosar } from "@/lib/actions";
 import { getDb, schema } from "@/lib/db";
 
@@ -28,6 +30,7 @@ export default async function DosarPage({
 }: {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ err?: string; warn?: string }>;
+
 }) {
   const { id } = await params;
   const { err, warn } = await searchParams;
@@ -75,6 +78,14 @@ export default async function DosarPage({
   const fields = processed ? buildFisa(extractions, overrides, photoIdsByExtraction) : [];
   const unverifiedCount = fields.filter((f) => f.value && f.confidence.state !== "verified").length;
 
+  // Policies attached to this dosar — surfaced when status is gata (upload form) or emis (cards).
+  const policies = db
+    .select()
+    .from(schema.policies)
+    .where(eq(schema.policies.dosarId, id))
+    .all();
+  const showPolicyArea = dosar.status === "gata" || dosar.status === "emis";
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -95,6 +106,11 @@ export default async function DosarPage({
       {err === "extract" ? (
         <div className="rounded-lg border border-fail/30 bg-fail/5 px-4 py-3 text-sm text-fail">
           Niciun document nu a putut fi citit. Verifică pozele sau cheia API (detalii în consola serverului).
+        </div>
+      ) : null}
+      {err === "pdf" ? (
+        <div className="rounded-lg border border-fail/30 bg-fail/5 px-4 py-3 text-sm text-fail">
+          Fișierul atașat nu este un PDF valid. Încearcă din nou cu o poliță în format PDF.
         </div>
       ) : null}
       {warn ? (
@@ -119,6 +135,30 @@ export default async function DosarPage({
         <>
           <PhotoClassification photos={processedPhotos} dosarId={dosar.id} />
           <FisaView fields={fields} photosByDoc={photosByDoc} dosarId={dosar.id} />
+
+          {showPolicyArea ? (
+            <section className="overflow-hidden rounded-xl border border-line bg-white">
+              <header className="border-b border-line bg-cloud px-4 py-3">
+                <h2 className="font-display text-lg text-ink">
+                  {policies.length > 0 ? "Polițe atașate" : "Atașează polița emisă"}
+                </h2>
+                <p className="mt-0.5 text-xs text-ink/55">
+                  {dosar.status === "emis"
+                    ? "Polița a fost emisă. PDF-ul este în arhivă conform GDPR și se purjează după 14 zile."
+                    : "Trage aici PDF-ul poliței după ce o emiți în Insuretech. AI-ul citește numărul, asigurătorul, datele de valabilitate și o leagă de dosar."}
+                </p>
+              </header>
+              <div className="space-y-3 p-4">
+                {policies.map((p) => (
+                  <PolicyCard key={p.id} dosarId={dosar.id} policy={p} />
+                ))}
+                {policies.length === 0 && dosar.status === "gata" ? (
+                  <PolicyUpload dosarId={dosar.id} />
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
           <StatusAdvance
             dosarId={dosar.id}
             status={dosar.status}

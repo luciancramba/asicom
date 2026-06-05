@@ -90,5 +90,9 @@ export const policies = sqliteTable("policies", {
   validFrom: text("valid_from"),
   validTo: text("valid_to"),
   source: text("source"), // pdf | manual
+  /** Path to the uploaded PDF on disk. Null when policy was manually entered. */
+  filepath: text("filepath"),
+  /** Set by the purge job after retention expires (default 14d post-emis). PDF removed; row kept. */
+  purgedAt: text("purged_at"),
   createdAt: text("created_at").default(nowIso).notNull(),
 });

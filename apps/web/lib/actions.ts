@@ -313,3 +313,163 @@ export async function rotatePhoto(formData: FormData): Promise<void> {
 
   revalidatePath(`/dosar/${dosarId}`);
 }
+
+// ---------- Policy attachment (PR6: emis) ----------
+
+const POLICY_RETENTION_DAYS = Number(process.env.PURGE_AFTER_EMIS_DAYS ?? 14);
+
+/**
+ * Attach a policy PDF to a dosar — save the file, ask Claude for structured metadata, insert a
+ * row in `policies` linked to dosar/client/vehicle. Status doesn't change here; broker still
+ * clicks "Marchează emis" to advance — keeps the gata→emis flow an explicit broker confirmation.
+ */
+export async function attachPolicy(formData: FormData): Promise<void> {
+  if (!(await getCurrentUser())) redirect("/login");
+  const dosarId = String(formData.get("dosarId") ?? "");
+  if (!dosarId) redirect("/");
+  if (!process.env.ANTHROPIC_API_KEY) redirect(`/dosar/${dosarId}?err=nokey`);
+
+  const file = formData.get("policy");
+  if (!(file instanceof File) || file.size === 0 || file.type !== "application/pdf") {
+    redirect(`/dosar/${dosarId}?err=pdf`);
+  }
+
+  const db = getDb();
+  const dosar = db.select().from(schema.dosare).where(eq(schema.dosare.id, dosarId)).get();
+  if (!dosar) redirect("/");
+
+  const { savePolicyUpload } = await import("./storage");
+  const { extractPolicyFromPdf } = await import("./policy");
+
+  const policyId = randomUUID();
+  const filepath = await savePolicyUpload(dosarId, policyId, file);
+
+  let extracted: Awaited<ReturnType<typeof extractPolicyFromPdf>> = null;
+  try {
+    extracted = await extractPolicyFromPdf(filepath);
+  } catch (err) {
+    console.error(`[attachPolicy] extract ${policyId}:`, err instanceof Error ? err.message : err);
+  }
+
+  // Pick the matching vehicle by plate (best-effort).
+  let vehicleId: string | null = null;
+  if (extracted?.plate && dosar.clientId) {
+    const v = db
+      .select()
+      .from(schema.vehicles)
+      .where(eq(schema.vehicles.clientId, dosar.clientId))
+      .all()
+      .find((row) => row.plate?.trim().toUpperCase() === extracted!.plate!.trim().toUpperCase());
+    if (v) vehicleId = v.id;
+  }
+
+  db.insert(schema.policies)
+    .values({
+      id: policyId,
+      dosarId,
+      clientId: dosar.clientId ?? null,
+      vehicleId,
+      policyNumber: extracted?.policyNumber ?? null,
+      insurer: extracted?.insurer ?? null,
+      type: extracted?.type ?? null,
+      validFrom: extracted?.validFrom ?? null,
+      validTo: extracted?.validTo ?? null,
+      source: "pdf",
+      filepath,
+    })
+    .run();
+
+  revalidatePath(`/dosar/${dosarId}`);
+}
+
+/** Delete a policy attachment (file + row). Broker may have uploaded the wrong PDF. */
+export async function deletePolicy(formData: FormData): Promise<void> {
+  if (!(await getCurrentUser())) redirect("/login");
+  const dosarId = String(formData.get("dosarId") ?? "");
+  const policyId = String(formData.get("policyId") ?? "");
+  if (!dosarId || !policyId) return;
+
+  const db = getDb();
+  const policy = db.select().from(schema.policies).where(eq(schema.policies.id, policyId)).get();
+  if (!policy || policy.dosarId !== dosarId) return;
+
+  if (policy.filepath) {
+    try {
+      const { unlink } = await import("node:fs/promises");
+      await unlink(policy.filepath);
+    } catch {
+      /* file may have been purged already — ignore */
+    }
+  }
+  db.delete(schema.policies).where(eq(schema.policies.id, policyId)).run();
+  revalidatePath(`/dosar/${dosarId}`);
+}
+
+// ---------- GDPR purge ----------
+
+export interface PurgeReport {
+  photosRemoved: number;
+  policiesRemoved: number;
+  cutoffIso: string;
+  retentionDays: number;
+}
+
+/**
+ * Sweep photos AND policy PDFs whose dosar was emis more than RETENTION_DAYS ago. Files are
+ * removed from disk; DB rows stay (with purged_at stamped) so the registry / KPIs still work.
+ */
+export async function runPurge(): Promise<PurgeReport> {
+  if (!(await getCurrentUser())) redirect("/login");
+  const db = getDb();
+  const cutoffIso = new Date(Date.now() - POLICY_RETENTION_DAYS * 86_400_000).toISOString();
+  const { unlink } = await import("node:fs/promises");
+  const stamp = new Date().toISOString();
+
+  const allDosare = db.select().from(schema.dosare).all();
+  const eligibleIds = allDosare
+    .filter((d) => d.status === "emis" && d.emisAt != null && d.emisAt < cutoffIso)
+    .map((d) => d.id);
+
+  let photosRemoved = 0;
+  let policiesRemoved = 0;
+
+  for (const dosarId of eligibleIds) {
+    const photos = db
+      .select()
+      .from(schema.photos)
+      .where(eq(schema.photos.dosarId, dosarId))
+      .all()
+      .filter((p) => p.purgedAt == null);
+    for (const p of photos) {
+      try {
+        await unlink(p.filepath);
+      } catch {
+        /* already gone */
+      }
+      db.update(schema.photos).set({ purgedAt: stamp }).where(eq(schema.photos.id, p.id)).run();
+      photosRemoved += 1;
+    }
+
+    const pols = db
+      .select()
+      .from(schema.policies)
+      .where(eq(schema.policies.dosarId, dosarId))
+      .all()
+      .filter((p) => p.purgedAt == null && p.filepath != null);
+    for (const p of pols) {
+      try {
+        if (p.filepath) await unlink(p.filepath);
+      } catch {
+        /* already gone */
+      }
+      db.update(schema.policies)
+        .set({ purgedAt: stamp, filepath: null })
+        .where(eq(schema.policies.id, p.id))
+        .run();
+      policiesRemoved += 1;
+    }
+  }
+
+  revalidatePath("/");
+  return { photosRemoved, policiesRemoved, cutoffIso, retentionDays: POLICY_RETENTION_DAYS };
+}

@@ -15,6 +15,13 @@
       "when": 1780675610243,
       "tag": "0001_fantastic_loki",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1780683858125,
+      "tag": "0002_mushy_vengeance",
+      "breakpoints": true
     }
   ]
 }

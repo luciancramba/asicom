@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StatusChip } from "@/components/status-chip";
 import { KpiStrip } from "@/components/kpi-strip";
 import { StatusPipeline } from "@/components/status-pipeline";
+import { PurgeButton } from "@/components/purge-button";
 import { getDosare, getKpis } from "@/lib/dashboard";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,9 @@ export default async function Dashboard({
 
       <KpiStrip kpis={kpis} />
       <StatusPipeline byStatus={kpis.byStatus} />
+      <div className="-mt-1 flex justify-end">
+        <PurgeButton />
+      </div>
 
       <div className="flex flex-col gap-3">
         <form action="/" className="flex gap-2">

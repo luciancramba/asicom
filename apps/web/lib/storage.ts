@@ -28,3 +28,19 @@ export async function saveUpload(dosarId: string, photoId: string, file: File): 
   await writeFile(filepath, Buffer.from(await file.arrayBuffer()));
   return filepath;
 }
+
+/**
+ * Save an uploaded policy PDF under UPLOAD_DIR/<dosarId>/policy-<policyId>.pdf. Kept alongside
+ * the dosar's photos so the same purge job sweeps them together once retention expires.
+ */
+export async function savePolicyUpload(
+  dosarId: string,
+  policyId: string,
+  file: File,
+): Promise<string> {
+  const dir = resolve(UPLOAD_DIR, dosarId);
+  await mkdir(dir, { recursive: true });
+  const filepath = join(dir, `policy-${policyId}.pdf`);
+  await writeFile(filepath, Buffer.from(await file.arrayBuffer()));
+  return filepath;
+}
