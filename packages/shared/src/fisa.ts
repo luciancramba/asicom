@@ -1,5 +1,18 @@
 import { FIELD_REGISTRY, type FieldDef } from "./fields";
 import { verified, unverified, failed, type FieldConfidence } from "./confidence";
+
+/**
+ * Broker-side override for one field on one dosar. Two independent flags:
+ *  - `value`     → broker-typed value replaces the extracted one (e.g. corrected name)
+ *  - `confirmed` → broker vouches that the (extracted or typed) value is correct
+ * Both, either, or neither may be set. When neither is set the entry is just dropped — the
+ * absence of an override is the canonical "no broker action" state.
+ */
+export interface FieldOverride {
+  value?: string;
+  confirmed?: boolean;
+}
+export type FieldOverrides = Record<string, FieldOverride | undefined>;
 import { validateCnp, type CnpDecoded } from "./validators/cnp";
 import { validateVin } from "./validators";
 import { validateExpiry, validateBirthDate, isValidIsoDate } from "./validators/dates";
@@ -165,22 +178,41 @@ export function collectDocs(extractions: ExtractionResult[]): Docs {
 
 /**
  * Map a dosar's extractions onto the field registry (Insuretech order) and compute the
- * three-state confidence per field. This is the trust engine: green = machine-verified.
+ * three-state confidence per field. This is the trust engine: green = machine-verified OR
+ * broker-confirmed. The `overrides` argument layers operator decisions on top of the machine
+ * extraction — a broker-typed value replaces the extracted one, and `confirmed: true` flips a
+ * non-empty field to a broker-stamped green. Existing call sites that pass only `extractions`
+ * keep their behaviour (no overrides).
  */
-export function buildFisa(extractions: ExtractionResult[]): FieldResult[] {
+export function buildFisa(
+  extractions: ExtractionResult[],
+  overrides: FieldOverrides = {},
+): FieldResult[] {
   const docs = collectDocs(extractions);
   const cnp = docs.buletin?.cnp ? validateCnp(docs.buletin.cnp) : undefined;
   const ctx: Ctx = { ...docs, cnp };
 
   return FIELD_REGISTRY.map((field) => {
-    const value = readValue(field, docs);
+    const override = overrides[field.id];
+
+    // Broker-typed value (if any) wins over the extracted one.
+    const extractedValue = readValue(field, docs);
+    const hasOverrideValue = typeof override?.value === "string";
+    const value = hasOverrideValue ? (override!.value as string).trim() || null : extractedValue;
+
+    // Confidence: compute as normal, then let a confirmed override stamp it broker-green.
+    let confidence = computeConfidence(field, value, ctx);
+    if (override?.confirmed && value !== null && value !== "") {
+      confidence = verified("Confirmat de operator", "broker");
+    }
+
     return {
       id: field.id,
       label: field.label,
       group: field.group,
       source: field.source,
       value,
-      confidence: computeConfidence(field, value, ctx),
+      confidence,
     };
   });
 }

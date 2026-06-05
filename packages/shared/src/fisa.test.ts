@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildFisa, type FieldResult } from "./fisa";
+import { buildFisa, type FieldResult, type FieldOverrides } from "./fisa";
 import type { ExtractionResult } from "./schemas";
 
 const find = (results: FieldResult[], id: string): FieldResult =>
@@ -61,6 +61,61 @@ describe("buildFisa", () => {
     const f = buildFisa([{ docType: "buletin", buletin: {} }]);
     expect(find(f, "client.cnp").confidence.state).toBe("unverified");
     expect(find(f, "client.telefon").confidence.state).toBe("unverified");
+  });
+
+  describe("broker overrides", () => {
+    const baseExtractions: ExtractionResult[] = [
+      // CNP intentionally invalid so the unconfirmed state is 🔴 — exercises the "broker rescues
+      // a failed field" path that the click-to-confirm UI relies on.
+      { docType: "buletin", buletin: { cnp: "1900515012342", nume: "Popescu" } },
+      { docType: "talon", talon: { marca: "MERCEDES-BENZ", model: "B 180 CDI" } },
+    ];
+
+    it("flips an unverified field to broker-verified when confirmed = true", () => {
+      const overrides: FieldOverrides = { "vehicul.marca": { confirmed: true } };
+      const f = buildFisa(baseExtractions, overrides);
+      const marca = find(f, "vehicul.marca");
+      expect(marca.value).toBe("MERCEDES-BENZ");
+      expect(marca.confidence.state).toBe("verified");
+      expect(marca.confidence.by).toBe("broker");
+      expect(marca.confidence.reason).toMatch(/operator/i);
+    });
+
+    it("uses a broker-typed value when override.value is set, and lands broker-verified when confirmed too", () => {
+      const overrides: FieldOverrides = {
+        "client.telefon": { value: "0723456789", confirmed: true },
+      };
+      const tel = find(buildFisa(baseExtractions, overrides), "client.telefon");
+      expect(tel.value).toBe("0723456789");
+      expect(tel.confidence.state).toBe("verified");
+      expect(tel.confidence.by).toBe("broker");
+    });
+
+    it("does NOT confirm an empty field — confirming nothing is meaningless", () => {
+      // Broker accidentally confirms a field they never filled. Should stay unverified, not green.
+      const overrides: FieldOverrides = { "client.email": { confirmed: true } };
+      const email = find(buildFisa(baseExtractions, overrides), "client.email");
+      expect(email.value).toBeNull();
+      expect(email.confidence.state).toBe("unverified");
+      expect(email.confidence.by).toBeUndefined();
+    });
+
+    it("a value-only override (no confirm) replaces the value but leaves machine confidence", () => {
+      // Useful for a future "edit but don't vouch yet" UI; today our edit path always sets both.
+      const overrides: FieldOverrides = { "vehicul.model": { value: "C 220 CDI" } };
+      const model = find(buildFisa(baseExtractions, overrides), "vehicul.model");
+      expect(model.value).toBe("C 220 CDI");
+      expect(model.confidence.state).toBe("unverified");
+      expect(model.confidence.by).toBeUndefined();
+    });
+
+    it("machine-verified greens carry by=\"machine\" so the source is queryable", () => {
+      const f = buildFisa([
+        { docType: "buletin", buletin: { cnp: "1900515012341", sex: "M", dataNasterii: "1990-05-15" } },
+      ]);
+      expect(find(f, "client.cnp").confidence.by).toBe("machine");
+      expect(find(f, "client.sex").confidence.by).toBe("machine");
+    });
   });
 
   it("treats hyphen/space and diacritics as equal when cross-checking names", () => {

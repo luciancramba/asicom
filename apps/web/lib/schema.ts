@@ -40,6 +40,13 @@ export const dosare = sqliteTable("dosare", {
   clientId: text("client_id").references(() => clients.id),
   minutesSavedEst: integer("minutes_saved_est"),
   notes: text("notes"),
+  /**
+   * Broker-side overrides on top of the machine extractions. JSON object keyed by field id:
+   *   { "client.cnp": { confirmed: true }, "client.telefon": { value: "0723…", confirmed: true } }
+   * Applied at render-time by buildFisa, so machine extractions remain untouched and a broker can
+   * always revert. Null/missing = no overrides yet. See packages/shared/src/fisa.ts.
+   */
+  fieldOverridesJson: text("field_overrides_json"),
   createdAt: text("created_at").default(nowIso).notNull(),
   processedAt: text("processed_at"),
   emisAt: text("emis_at"),

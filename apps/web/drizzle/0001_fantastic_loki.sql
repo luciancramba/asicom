@@ -1,0 +1,1 @@
+ALTER TABLE `dosare` ADD `field_overrides_json` text;
