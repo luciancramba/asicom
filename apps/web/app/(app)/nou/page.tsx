@@ -10,7 +10,7 @@ export default function NewDosarPage() {
         <p className="text-xs font-bold uppercase tracking-[0.28em] text-asicom-mid">Dosar nou</p>
         <h1 className="font-display text-3xl font-light text-ink">Încarcă documentele</h1>
         <p className="mt-2 text-ink/60">
-          Buletin, talon, permis — până la 5 poze. Le citim și verificăm automat.
+          Buletin, talon, permis — până la 6 poze. Le citim și verificăm automat.
         </p>
       </div>
 

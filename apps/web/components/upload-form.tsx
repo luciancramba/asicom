@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { createDosar } from "@/lib/actions";
 
-const MAX = 5;
+const MAX = 6;
 const MAX_EDGE = 1600; // plenty for document OCR; the vision model doesn't need full resolution
 const JPEG_QUALITY = 0.85;
 

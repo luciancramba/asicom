@@ -10,7 +10,7 @@ import { saveUpload } from "./storage";
 import { extractDocument } from "./vision";
 import { syncClientFromExtractions } from "./clients";
 
-const MAX_PHOTOS = 5;
+const MAX_PHOTOS = 6;
 
 /** Create a dosar from uploaded photos: store files, insert dosar + photo rows, go to the dosar. */
 export async function createDosar(formData: FormData): Promise<void> {
