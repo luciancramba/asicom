@@ -1,7 +1,10 @@
-# Issuedoc
+# Asicom · Emitere asistată
 
-Internal tool for an insurance brokerage assistant (ASICOM / Asigest network). Client documents
-arrive as phone photos (buletin, talon, permis); Issuedoc extracts the data, validates it
+> Product brand: **Asicom** (Brand Book v1.0, `docs/brand.md`). `issuedoc` is the repo/internal
+> codename only — not user-facing.
+
+Internal tool for an insurance brokerage assistant (Asicom / Asigest network). Client documents
+arrive as phone photos (buletin, talon, permis); Asicom extracts the data, validates it
 deterministically, and renders a **fișă de emitere** — every field in Insuretech's form order,
 with a trust badge and the source document beside it — so issuance takes ~2 min instead of ~15.
 
