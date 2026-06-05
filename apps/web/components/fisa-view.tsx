@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { fieldsByGroup, type FieldResult, type FieldGroup } from "@asicom/shared";
 import { ConfidenceBadge } from "./confidence-badge";
+import { ImageViewer } from "./image-viewer";
 import { setFieldValue, toggleFieldConfirmed } from "@/lib/actions";
 
 const GROUPS: { key: FieldGroup; title: string; source?: "buletin" | "talon" }[] = [
@@ -186,7 +187,7 @@ export function FisaView({
               {photoId ? <span className="font-mono text-xs text-ink/40">sursă: {g.source}</span> : null}
             </header>
 
-            <div className="grid gap-4 p-4 sm:grid-cols-[1fr_auto]">
+            <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_22rem]">
               <ul className="flex flex-col divide-y divide-line">
                 {rows.map((f) => {
                   const isActive = f.id === activeId;
@@ -288,13 +289,17 @@ export function FisaView({
               </ul>
 
               {photoId ? (
-                <div className="hidden w-40 shrink-0 sm:block">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/photo/${photoId}`}
-                    alt={g.title}
-                    className="w-full rounded-lg border border-line object-cover"
-                  />
+                <div className="hidden sm:block">
+                  <div className="sticky top-4">
+                    <ImageViewer
+                      src={`/api/photo/${photoId}`}
+                      alt={g.title}
+                      caption={g.title}
+                    />
+                    <p className="mt-1.5 text-center text-[11px] text-ink/40">
+                      Apasă pe imagine pentru a o mări
+                    </p>
+                  </div>
                 </div>
               ) : null}
             </div>
